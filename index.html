@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Goal Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav">
+      <button class="nav-item active" data-section="goals">Goals</button>
+      <button class="nav-item" data-section="skills">Skills</button>
+      <button class="nav-item" data-section="statistics">Statistics</button>
+    </nav>
+
+    <div class="topbar-actions">
+      <label class="search">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="search" placeholder="Find a goal or skill..." />
+      </label>
+      <button class="auth-btn" id="authBtn" title="Sign in to sync progress">Sign in with Google</button>
+      <button class="icon-btn" aria-label="Notifications">◔</button>
+      <button class="icon-btn" aria-label="Settings">⚙</button>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="main-column">
+      <div class="section-head">
+        <h1>MY GOALS</h1>
+        <button class="primary-btn" id="openGoalModalBtn">+ Add goal</button>
+      </div>
+
+      <div class="goal-board" id="goalBoard">
+        <article class="goal-column daily" data-type="daily">
+          <div class="column-header">
+            <h2>DAILY</h2>
+            <span class="goal-count" data-count="daily">0 goals</span>
+          </div>
+          <div class="goal-list" data-list="daily"></div>
+          <button class="column-add-btn" data-add-goal="daily">+ Add goal</button>
+        </article>
+
+        <article class="goal-column short" data-type="short">
+          <div class="column-header">
+            <h2>SHORT</h2>
+            <span class="goal-count" data-count="short">0 goals</span>
+          </div>
+          <div class="goal-list" data-list="short"></div>
+          <button class="column-add-btn" data-add-goal="short">+ Add goal</button>
+        </article>
+
+        <article class="goal-column medium" data-type="medium">
+          <div class="column-header">
+            <h2>MEDIUM</h2>
+            <span class="goal-count" data-count="medium">0 goals</span>
+          </div>
+          <div class="goal-list" data-list="medium"></div>
+          <button class="column-add-btn" data-add-goal="medium">+ Add goal</button>
+        </article>
+
+        <article class="goal-column long" data-type="long">
+          <div class="column-header">
+            <h2>LONG</h2>
+            <span class="goal-count" data-count="long">0 goals</span>
+          </div>
+          <div class="goal-list" data-list="long"></div>
+          <button class="column-add-btn" data-add-goal="long">+ Add goal</button>
+        </article>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <section class="profile-card panel">
+        <div class="avatar" aria-hidden="true">
+          <div class="avatar-head"></div>
+          <div class="avatar-body"></div>
+        </div>
+
+        <div class="profile-content">
+          <div class="profile-topline">
+            <div class="profile-name-group">
+              <h2 id="profileName">User User</h2>
+              <span class="streak-flame" hidden title="Daily streak">
+                <span class="streak-fire">🔥</span>
+                <strong id="streakValue">0</strong>
+              </span>
+            </div>
+            <button class="secondary-btn" id="editProfileBtn">Edit</button>
+          </div>
+
+          <div class="level-row">
+            <strong>LEVEL <span id="levelValue">1</span></strong>
+            <span><span id="xpValue">0</span> / <span id="xpMaxValue">100</span> XP</span>
+          </div>
+
+          <div class="progress">
+            <div class="progress-fill xp-fill" id="xpBar"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="skills-card panel">
+        <div class="skills-head">
+          <h2>SKILLS</h2>
+          <button class="secondary-btn" id="openSkillModalBtn">+ Add skill</button>
+        </div>
+        <div class="skills-grid" id="skillsGrid"></div>
+      </section>
+    </aside>
+  </main>
+
+  <dialog class="modal" id="goalModal">
+    <form method="dialog" class="modal-card" id="goalForm">
+      <div class="modal-head">
+        <h2 id="goalModalTitle">Add goal</h2>
+        <button type="button" class="close-btn" data-close="goalModal">×</button>
+      </div>
+
+      <input type="hidden" id="goalId" />
+
+      <label>
+        Title
+        <input id="goalTitle" required maxlength="80" placeholder="e.g. Read 20 pages" />
+      </label>
+
+      <label>
+        Type
+        <select id="goalType" required>
+          <option value="daily">Daily</option>
+          <option value="short">Short</option>
+          <option value="medium">Medium</option>
+          <option value="long">Long</option>
+        </select>
+      </label>
+
+      <label>
+        Skill
+        <select id="goalSkill" required>
+          <option value="">Select a skill</option>
+        </select>
+      </label>
+
+      <label>
+        Parent goal
+        <select id="goalParent">
+          <option value="">No parent goal</option>
+        </select>
+      </label>
+
+      <label>
+        Description
+        <textarea id="goalDescription" rows="3" maxlength="160" placeholder="Optional"></textarea>
+      </label>
+
+      <label>
+        XP reward
+        <select id="goalXp" required></select>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="goalModal">Cancel</button>
+        <button class="primary-btn" type="submit">Save goal</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="skillModal">
+    <form method="dialog" class="modal-card" id="skillForm">
+      <div class="modal-head">
+        <h2 id="skillModalTitle">Add skill</h2>
+        <button type="button" class="close-btn" data-close="skillModal">×</button>
+      </div>
+
+      <input type="hidden" id="skillId" />
+
+      <label>
+        Skill name
+        <input id="skillName" required maxlength="50" placeholder="e.g. Reading" />
+      </label>
+
+      <label>
+        What I want from a skill
+        <textarea id="skillGoal" rows="3" maxlength="160" placeholder="Optional"></textarea>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="skillModal">Cancel</button>
+        <button class="primary-btn" type="submit">Save skill</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="profileModal">
+    <form method="dialog" class="modal-card" id="profileForm">
+      <div class="modal-head">
+        <h2>Edit profile</h2>
+        <button type="button" class="close-btn" data-close="profileModal">×</button>
+      </div>
+
+      <label>
+        Name
+        <input id="profileNameInput" required maxlength="40" />
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="profileModal">Cancel</button>
+        <button class="primary-btn" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="goalCardTemplate">
+    <article class="goal-card">
+      <div class="goal-card-top">
+        <label class="goal-check">
+          <input type="checkbox" />
+          <span></span>
+        </label>
+        <h3></h3>
+        <strong class="goal-xp"></strong>
+      </div>
+      <p class="goal-description"></p>
+      <p class="goal-skill" hidden>Skill: <span class="goal-skill-name"></span></p>
+      <p class="goal-parent" hidden>Part of: <span class="goal-parent-title"></span></p>
+      <div class="goal-card-actions">
+        <button class="mini-btn edit-goal" type="button">Edit</button>
+        <button class="mini-btn danger delete-goal" type="button">Delete</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="skillCardTemplate">
+    <article class="skill-row">
+      <div class="skill-top">
+        <div>
+          <a class="skill-name" href="#"></a>
+          <span class="skill-level">Lvl. 1</span>
+        </div>
+        <span class="skill-points"></span>
+      </div>
+      <div class="progress">
+        <div class="progress-fill skill-fill"></div>
+      </div>
+      <div class="skill-actions">
+        <button class="mini-btn edit-skill" type="button">Edit</button>
+        <button class="mini-btn danger delete-skill" type="button">Delete</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase.init.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
