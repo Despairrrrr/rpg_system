@@ -1784,6 +1784,8 @@ document
 
 const SYNC_DEBOUNCE = 800;
 
+const LOGIN_PAGE = "login.html";
+
 let currentUser = null;
 let syncTimer = null;
 
@@ -1798,16 +1800,21 @@ function renderAuthButton() {
     );
 
     els.authBtn.textContent =
-      "Sign in with Google";
+      "Sign in";
 
     els.authBtn.title =
       "Sign in to sync progress across devices";
+
+    els.authBtn.href = LOGIN_PAGE;
     return;
   }
 
   els.authBtn.classList.add(
     "logged-in"
   );
+
+  // Signed in: the element is a sign-out control, not a navigation link.
+  els.authBtn.removeAttribute("href");
 
   els.authBtn.title =
     `${currentUser.displayName || currentUser.email} — click to sign out`;
@@ -1946,38 +1953,26 @@ function initAuth() {
     return;
   }
 
-  const provider =
-    new firebase.auth.GoogleAuthProvider();
-
+  // The button is a link to login.html, so a signed-out click is left to
+  // the browser. Only the signed-in state (avatar) needs intercepting.
   els.authBtn.addEventListener(
     "click",
-    () => {
-      if (currentUser) {
-        if (
-          confirm(
-            "Sign out? Your progress stays saved."
-          )
-        ) {
-          firebase.auth().signOut();
-        }
+    (event) => {
+      if (!currentUser) {
         return;
       }
 
-      firebase
-        .auth()
-        .signInWithPopup(provider)
-        .catch((error) => {
-          console.warn(
-            "Sign-in failed.",
-            error
-          );
+      event.preventDefault();
 
-          if (error.code) {
-            alert(
-              `Sign-in failed: ${error.message}`
-            );
-          }
-        });
+      if (
+        confirm(
+          "Sign out? Your progress stays saved."
+        )
+      ) {
+        firebase
+          .auth()
+          .signOut();
+      }
     }
   );
 
