@@ -64,7 +64,7 @@ creates the Firebase user, later ones just sign it in.
   (`READING LEVEL UP — Lv. 4 → Lv. 5`); two level-ups play one after the other. The one goal
   reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
   in `styles.css` and are reduced under `prefers-reduced-motion`.
-- Daily streak: completing at least one goal per day grows an animated flame next to the profile name; missing a day resets it at local 00:00.
+- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00.
 - Optional sign-in via a dedicated `login.html` page with a "Continue with Google" button, syncing progress across devices (last-write-wins).
 - Responsive layout.
 

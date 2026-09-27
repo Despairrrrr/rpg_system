@@ -77,8 +77,7 @@ const els = {
   profileForm: document.querySelector("#profileForm"),
   profileNameInput: document.querySelector("#profileNameInput"),
   profileName: document.querySelector("#profileName"),
-  streakFlame: document.querySelector(".streak-flame"),
-  streakValue: document.querySelector("#streakValue"),
+  streakBadgeHost: document.querySelector("#streakBadgeHost"),
 
   xpValue: document.querySelector("#xpValue"),
   xpMaxValue: document.querySelector("#xpMaxValue"),
@@ -235,6 +234,124 @@ function checkStreakExpiry() {
     saveState();
   }
 }
+
+
+// ===============================
+// STREAK BADGE
+// ===============================
+
+// Presentation only. The streak count itself is owned by
+// bumpStreak() and checkStreakExpiry() above, this component
+// never reads anything but the number it is given.
+const STREAK_TIERS = [
+  { tier: 0, from: 0 },
+  { tier: 1, from: 1 },
+  { tier: 2, from: 3 },
+  { tier: 3, from: 6 },
+  { tier: 4, from: 14 },
+];
+
+// Two flat shapes, not a photo flame: angular orange body plus a
+// smaller yellow core. Static SVG, so the tier look comes from CSS.
+const STREAK_FLAME_SVG = [
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+  '<path class="streak-badge__flame-outer" d="M12 1.6c1.5 3.1 1.2 4.6 2.5 6.4 1.1 1.5 2.5 2.9 2.5 5.2a5 5 0 0 1-10 0c0-2 .9-3.2 2.1-4.4-.1 1.5.4 2.3 1 2.7-.2-2.7.6-5.8 1.9-9.9Z"/>',
+  '<path class="streak-badge__flame-inner" d="M12 10.5c1.3 1.5 2 2.6 2 3.7a2 2 0 0 1-4 0c0-1.1.7-2.2 2-3.7Z"/>',
+  "</svg>",
+].join("");
+
+
+function getStreakCount(streak) {
+  return Math.max(
+    0,
+    Number(streak) || 0
+  );
+}
+
+
+function getStreakTier(streak) {
+  const count =
+    getStreakCount(streak);
+
+  return STREAK_TIERS.reduce(
+    (tier, step) =>
+      count >= step.from
+        ? step.tier
+        : tier,
+    0
+  );
+}
+
+
+// Mounts the badge markup once and then only swaps tier + text,
+// so the same badge can be reused anywhere in the profile UI.
+function createStreakBadge(host) {
+  if (!host) {
+    return null;
+  }
+
+  const icon =
+    document.createElement(
+      "span"
+    );
+
+  icon.className =
+    "streak-badge__icon";
+
+  icon.innerHTML =
+    STREAK_FLAME_SVG;
+
+  const value =
+    document.createElement(
+      "span"
+    );
+
+  value.className =
+    "streak-badge__value";
+
+  const frame =
+    document.createElement(
+      "div"
+    );
+
+  frame.className =
+    "streak-badge__frame";
+
+  frame.append(
+    icon,
+    value
+  );
+
+  host.append(frame);
+
+  return {
+    render(streak) {
+      const count =
+        getStreakCount(streak);
+
+      const days =
+        count === 1
+          ? "day"
+          : "days";
+
+      host.className =
+        `streak-badge ` +
+        `streak-badge--tier-${getStreakTier(count)}`;
+
+      host.title =
+        `Daily streak: ${count} ${days}`;
+
+      value.textContent =
+        `${count} ${days}`;
+    },
+  };
+}
+
+
+const streakBadge =
+  createStreakBadge(
+    els.streakBadgeHost
+  );
 
 
 // ===============================
@@ -667,11 +784,9 @@ function renderProfile() {
   els.profileName.textContent =
     state.profile.name;
 
-  els.streakValue.textContent =
-    state.streak.count;
-
-  els.streakFlame.hidden =
-    state.streak.count <= 0;
+  streakBadge?.render(
+    state.streak.count
+  );
 
   const totalXP = getTotalPlayerXp();
 

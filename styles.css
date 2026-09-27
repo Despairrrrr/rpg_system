@@ -550,6 +550,10 @@ button { cursor: pointer; }
 
 .profile-topline h2 {
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 20px;
 }
 
@@ -560,50 +564,300 @@ button { cursor: pointer; }
   min-width: 0;
 }
 
-.streak-flame {
+
+/* ===============================
+   STREAK BADGE
+   =============================== */
+
+/* Game-style streak badge: a dark inner capsule inside an angular
+   frame. Every tier changes the frame silhouette (clip-path) and the
+   ring thickness, never the badge size. Tier values live on
+   .streak-badge so the frame and both of its layers can read them.
+   --sb-cut:   corner chamfer of the silhouette
+   --sb-ring:  frame border thickness (the dark surface is inset by it)
+   --sb-bite:  depth of the angular notches cut into the left/right
+               edges, 0 for the tiers that stay plain */
+.streak-badge {
+  --sb-height: 30px;
+  --sb-cut: 5px;
+  --sb-ring: 1px;
+  --sb-bite: 0px;
+  /* 2 - sqrt(2). A chamfer shrunk by a full ring would sit on the same
+     diagonal as the frame and pinch the border to nothing, so the inner
+     surface keeps a slightly smaller cut to keep the band even. */
+  --sb-inner-cut: calc(var(--sb-cut) - var(--sb-ring) * 0.5858);
+  --sb-surface: #081c2b;
+  --sb-text: var(--muted);
+  --sb-frame: linear-gradient(150deg, #4b6a83, #2c4459);
+  --sb-glow: none;
+  --sb-inner: transparent;
+  --sb-inner-inset: 0px;
+  --sb-flame-outer: #79879a;
+  --sb-flame-inner: #94a2b1;
+
+  position: relative;
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 174, 22, 0.55);
-  background: rgba(255, 174, 22, 0.12);
-  color: var(--orange);
-  font-size: 12px;
+  flex: 0 1 auto;
+  min-width: 0;
   white-space: nowrap;
 }
 
-.streak-flame[hidden] {
-  display: none;
+.streak-badge__frame {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: var(--sb-height);
+  padding: 0 calc(var(--sb-ring) + 6px);
+  background: var(--sb-frame);
+  filter: var(--sb-glow);
 }
 
-.streak-fire {
-  display: inline-block;
-  line-height: 1;
-  animation: streakFlicker 0.9s ease-in-out infinite;
+/* Dark inner surface. Insetting it inside the clipped frame is what
+   leaves the border, so the band keeps one flat colour. The chamfer
+   shrinks with the ring so the diagonal stays the same width. */
+.streak-badge__frame::before {
+  content: "";
+  position: absolute;
+  inset: var(--sb-ring);
+  background: var(--sb-surface);
+  clip-path: polygon(
+    var(--sb-inner-cut) 0,
+    calc(100% - var(--sb-inner-cut)) 0,
+    100% var(--sb-inner-cut),
+    100% calc(100% - var(--sb-inner-cut)),
+    calc(100% - var(--sb-inner-cut)) 100%,
+    var(--sb-inner-cut) 100%,
+    0 calc(100% - var(--sb-inner-cut)),
+    0 var(--sb-inner-cut)
+  );
 }
 
-@keyframes streakFlicker {
-  0%,
-  100% {
-    transform: scale(1) rotate(-3deg);
-    filter: brightness(1);
-  }
+/* Second hairline. The two top tiers use it for the double outline,
+   the lower tiers leave it transparent. */
+.streak-badge__frame::after {
+  content: "";
+  position: absolute;
+  inset: var(--sb-inner-inset);
+  border: 1px solid var(--sb-inner);
+  border-radius: 2px;
+}
 
-  30% {
-    transform: scale(1.18) rotate(3deg);
-    filter: brightness(1.3);
-  }
+.streak-badge__icon,
+.streak-badge__value {
+  position: relative;
+  z-index: 1;
+}
 
-  55% {
-    transform: scale(0.96) rotate(-2deg);
-    filter: brightness(0.9);
-  }
+.streak-badge__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 17px;
+}
 
-  75% {
-    transform: scale(1.08) rotate(1deg);
-    filter: brightness(1.15);
-  }
+.streak-badge__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.streak-badge__flame-outer {
+  fill: var(--sb-flame-outer);
+}
+
+.streak-badge__flame-inner {
+  fill: var(--sb-flame-inner);
+}
+
+.streak-badge__value {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--sb-text);
+}
+
+/* Tier 0 - dormant. Muted frame, flat chamfer, gray flame, no glow. */
+.streak-badge--tier-0 {
+  --sb-cut: 5px;
+  --sb-ring: 1px;
+}
+
+.streak-badge--tier-0 .streak-badge__frame {
+  clip-path: polygon(
+    5px 0,
+    calc(100% - 5px) 0,
+    100% 5px,
+    100% calc(100% - 5px),
+    calc(100% - 5px) 100%,
+    5px 100%,
+    0 calc(100% - 5px),
+    0 5px
+  );
+}
+
+/* Tier 1 - first hit. Cyan frame, clean chamfered capsule, soft glow. */
+.streak-badge--tier-1 {
+  --sb-cut: 7px;
+  --sb-ring: 1px;
+  --sb-text: #dff0ff;
+  --sb-frame: linear-gradient(150deg, #2f9fe0, #1b6ea8);
+  --sb-glow: drop-shadow(0 0 5px rgba(32, 185, 255, 0.34));
+  --sb-flame-outer: var(--orange);
+  --sb-flame-inner: var(--yellow);
+}
+
+.streak-badge--tier-1 .streak-badge__frame {
+  clip-path: polygon(
+    7px 0,
+    calc(100% - 7px) 0,
+    100% 7px,
+    100% calc(100% - 7px),
+    calc(100% - 7px) 100%,
+    7px 100%,
+    0 calc(100% - 7px),
+    0 7px
+  );
+}
+
+/* Tier 2 - teal, thicker ring and one angular notch per side. */
+.streak-badge--tier-2 {
+  --sb-cut: 6px;
+  --sb-ring: 2px;
+  --sb-bite: 5px;
+  --sb-text: #dff7ff;
+  --sb-frame: linear-gradient(150deg, #3ae0cf, #0f9dc0);
+  --sb-glow: drop-shadow(0 0 6px rgba(58, 224, 207, 0.38));
+  --sb-flame-outer: var(--orange);
+  --sb-flame-inner: var(--yellow);
+}
+
+.streak-badge--tier-2 .streak-badge__frame {
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 6px,
+    calc(100% - var(--sb-bite)) calc(50% - 5px),
+    100% 50%,
+    calc(100% - var(--sb-bite)) calc(50% + 5px),
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 6px),
+    0 calc(50% + 5px),
+    var(--sb-bite) 50%,
+    0 calc(50% - 5px),
+    0 6px
+  );
+}
+
+/* Tier 3 - amber. Side notches plus a notch engraved into the top
+   and bottom edges, and the first inner hairline. */
+.streak-badge--tier-3 {
+  --sb-cut: 7px;
+  --sb-ring: 2px;
+  --sb-bite: 6px;
+  --sb-text: #fff3dc;
+  --sb-frame: linear-gradient(150deg, var(--orange), #ff6f16);
+  --sb-glow: drop-shadow(0 0 7px rgba(255, 174, 22, 0.44));
+  --sb-inner: rgba(255, 213, 28, 0.5);
+  --sb-inner-inset: 5px;
+  --sb-flame-outer: var(--orange);
+  --sb-flame-inner: var(--yellow);
+}
+
+.streak-badge--tier-3 .streak-badge__frame {
+  clip-path: polygon(
+    7px 0,
+    40% 0,
+    50% 5px,
+    60% 0,
+    calc(100% - 7px) 0,
+    100% 7px,
+    calc(100% - var(--sb-bite)) calc(50% - 5px),
+    100% 50%,
+    calc(100% - var(--sb-bite)) calc(50% + 5px),
+    100% calc(100% - 7px),
+    calc(100% - 7px) 100%,
+    60% 100%,
+    50% calc(100% - 5px),
+    40% 100%,
+    7px 100%,
+    0 calc(100% - 7px),
+    0 calc(50% + 5px),
+    var(--sb-bite) 50%,
+    0 calc(50% - 5px),
+    0 7px
+  );
+}
+
+/* Tier 4 - premium. Heaviest ring, side notches, a crest on top, a
+   notch underneath, a second hairline and a small gold stud. */
+.streak-badge--tier-4 {
+  --sb-cut: 8px;
+  --sb-ring: 3px;
+  --sb-bite: 7px;
+  --sb-text: #fff6e4;
+  --sb-frame: linear-gradient(
+    150deg,
+    #ff3d5a,
+    var(--orange) 55%,
+    var(--yellow)
+  );
+  --sb-glow:
+    drop-shadow(0 0 8px rgba(255, 120, 30, 0.5))
+    drop-shadow(0 0 14px rgba(255, 190, 40, 0.22));
+  --sb-inner: rgba(255, 213, 28, 0.72);
+  --sb-inner-inset: 7px;
+  --sb-flame-outer: #ff6a1a;
+  --sb-flame-inner: #ffe14d;
+}
+
+.streak-badge--tier-4 .streak-badge__frame {
+  clip-path: polygon(
+    8px 0,
+    40% 0,
+    50% 5px,
+    60% 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    calc(100% - var(--sb-bite)) calc(50% - 5px),
+    100% 50%,
+    calc(100% - var(--sb-bite)) calc(50% + 5px),
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    60% 100%,
+    50% calc(100% - 5px),
+    40% 100%,
+    8px 100%,
+    0 calc(100% - 8px),
+    0 calc(50% + 5px),
+    var(--sb-bite) 50%,
+    0 calc(50% - 5px),
+    0 8px
+  );
+}
+
+.streak-badge--tier-4::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 13px;
+  height: 4px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #ffe9a8, var(--orange));
+  clip-path: polygon(
+    0 100%,
+    16% 0,
+    84% 0,
+    100% 100%,
+    76% 100%,
+    50% 46%,
+    24% 100%
+  );
 }
 
 .level-row {
@@ -1028,6 +1282,32 @@ button { cursor: pointer; }
   .avatar-body {
     left: 10px;
     bottom: 12px;
+  }
+
+  /* Streak badge shrinks instead of pushing the name out of the card.
+     The frame polygons position their notches with 50%, so they
+     follow the height on their own. */
+  .streak-badge {
+    --sb-height: 26px;
+  }
+
+  .streak-badge__frame {
+    gap: 4px;
+    padding-inline: calc(var(--sb-ring) + 4px);
+  }
+
+  .streak-badge__icon {
+    width: 13px;
+    height: 15px;
+  }
+
+  .streak-badge__value {
+    font-size: 11px;
+  }
+
+  .streak-badge--tier-4::before {
+    width: 11px;
+    height: 3px;
   }
 
   .skills-grid {
