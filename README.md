@@ -149,4 +149,10 @@ The site is purely static — no server needed:
    and `skill.html` — bump `N` on each deploy to force browsers to refetch. To confirm a
    deploy, open `https://<your-username>.github.io/<repo>/?v=2` (the extra query bypasses the
    cached page itself) and fall back to `Ctrl+Shift+R`. The HTML comment in the profile card
-   (`<!-- streak badge v2 -->`) shows which build is live.
+   (`<!-- streak badge v3 -->`) shows which build is live.
+
+### Streak badge motion
+
+Active streaks animate the flame silhouette and core independently; the frame stays steady with a faint breathing glow. Increases briefly flare the flame and roll the label; tier changes crossfade the frame. Initial rendering and resets do not celebrate. Reduced motion disables all badge animation, including when the preference changes mid-animation.
+
+Run presentation-state checks from `front` with `gjs tests/streak-motion.js` or `node tests/streak-motion.js`.

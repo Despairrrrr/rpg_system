@@ -251,14 +251,14 @@ const STREAK_TIERS = [
   { tier: 4, from: 14 },
 ];
 
-// Two flat shapes, not a photo flame: angular orange body plus a
-// smaller yellow core. Static SVG, so the tier look comes from CSS.
+// Static flame with an orange silhouette and a warm yellow core.
+// Frame artwork and flame colors follow the tier through CSS.
 // index.html and skill.html carry the canonical copy; this is the
 // fallback for hosts that ship without badge markup.
 const STREAK_FLAME_SVG = [
   '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
-  '<path class="streak-badge__flame-outer" d="M12 1.6c1.5 3.1 1.2 4.6 2.5 6.4 1.1 1.5 2.5 2.9 2.5 5.2a5 5 0 0 1-10 0c0-2 .9-3.2 2.1-4.4-.1 1.5.4 2.3 1 2.7-.2-2.7.6-5.8 1.9-9.9Z"/>',
-  '<path class="streak-badge__flame-inner" d="M12 10.5c1.3 1.5 2 2.6 2 3.7a2 2 0 0 1-4 0c0-1.1.7-2.2 2-3.7Z"/>',
+  '<path class="streak-badge__flame-outer" d="M13 1C8 4 7 8 9 12 6 11 6 8 6 7 2 11 2 14 3 17 4 21 7 23 12 23 18 23 21 19 21 15 21 11 19 8 17 6 18 10 16 12 15 12 16 8 11 6 13 1Z"/>',
+  '<path class="streak-badge__flame-inner" d="M12 11C13 15 16 15 16 18 16 21 14 22 12 22 8 22 7 20 7 18 7 16 8 15 9 14 9 17 10 18 11 18 10 15 12 14 12 11Z"/>',
   "</svg>",
 ].join("");
 
@@ -324,72 +324,67 @@ function buildStreakFrame() {
 }
 
 
-// Reuses the badge markup that already ships inside the host and
-// then only swaps tier + text, so the badge can be reused anywhere.
-// The markup lives in the HTML rather than here, which keeps the
-// badge on screen even when this script never runs - that is the
-// exact state a stale cached app.js leaves behind.
+// Keep motion local to presentation; the first render is always static.
 function createStreakBadge(host) {
-  if (!host) {
-    return null;
-  }
-
-  let frame =
-    host.querySelector(
-      ".streak-badge__frame"
-    );
-
+  if (!host) return null;
+  let frame = host.querySelector(".streak-badge__frame");
   if (!frame) {
-    frame =
-      buildStreakFrame();
-
+    frame = buildStreakFrame();
     host.append(frame);
   }
-
-  let value =
-    frame.querySelector(
-      ".streak-badge__value"
-    );
-
+  let value = frame.querySelector(".streak-badge__value");
   if (!value) {
-    value =
-      document.createElement(
-        "span"
-      );
-
-    value.className =
-      "streak-badge__value";
-
+    value = document.createElement("span");
+    value.className = "streak-badge__value";
     frame.append(value);
   }
 
+  const previousFrame = document.createElement("span");
+  previousFrame.className = "streak-badge__previous-frame";
+  previousFrame.setAttribute("aria-hidden", "true");
+  frame.append(previousFrame);
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let previousCount = null;
+  let finishTimer;
+
+  function settle() {
+    clearTimeout(finishTimer);
+    host.dataset.motion = "idle";
+    value.removeAttribute("data-previous");
+    previousFrame.style.removeProperty("--sb-previous-art");
+  }
+  reducedMotion.addEventListener("change", settle);
+  settle();
+
   return {
     render(streak) {
-      const count =
-        getStreakCount(streak);
+      const count = getStreakCount(streak);
+      // Unrelated dashboard renders must not interrupt an ongoing celebration.
+      if (count === previousCount) return;
+      const tier = getStreakTier(count);
+      const increased = previousCount !== null && count > previousCount;
+      const tierUp = increased && tier > getStreakTier(previousCount);
+      const oldText = value.textContent;
+      const oldArt = getComputedStyle(host).getPropertyValue("--sb-art");
+      settle();
+      STREAK_TIERS.forEach((step) => {
+        host.classList.toggle(`streak-badge--tier-${step.tier}`, step.tier === tier);
+      });
+      const label = `${count} ${count === 1 ? "day" : "days"}`;
+      host.title = `Daily streak: ${label}`;
+      // The accessible and final value update immediately; the old value is visual only.
+      value.setAttribute("aria-label", label);
+      value.textContent = label;
+      previousCount = count;
 
-      const days =
-        count === 1
-          ? "day"
-          : "days";
-
-      const tier =
-        getStreakTier(count);
-
-      STREAK_TIERS.forEach(
-        (step) => {
-          host.classList.toggle(
-            `streak-badge--tier-${step.tier}`,
-            step.tier === tier
-          );
-        }
-      );
-
-      host.title =
-        `Daily streak: ${count} ${days}`;
-
-      value.textContent =
-        `${count} ${days}`;
+      if (increased && !reducedMotion.matches) {
+        value.dataset.previous = oldText;
+        previousFrame.style.setProperty("--sb-previous-art", oldArt);
+        // Flush the reset only on an increase so rapid updates restart cleanly.
+        void host.offsetWidth;
+        host.dataset.motion = tierUp ? "tier-up" : "incrementing";
+        finishTimer = setTimeout(settle, tierUp ? 850 : 550);
+      }
     },
   };
 }

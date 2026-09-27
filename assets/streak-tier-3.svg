@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="170" height="64" viewBox="-5 -8 170 64" fill="none">
+<defs>
+ <linearGradient id="rim" x1="25" y1="8" x2="120" y2="55" gradientUnits="userSpaceOnUse"><stop stop-color="#ffe482"/><stop offset=".35" stop-color="#ffa900"/><stop offset=".66" stop-color="#ffe482"/><stop offset="1" stop-color="#ffa900"/></linearGradient>
+ <linearGradient id="surface" x2="0" y2="1"><stop stop-color="#062032"/><stop offset="1" stop-color="#020e19"/></linearGradient>
+ <linearGradient id="gold" x2="0" y2="1"><stop stop-color="#fff2a3"/><stop offset=".5" stop-color="#ffc134"/><stop offset="1" stop-color="#ff7432"/></linearGradient>
+</defs>
+<path d="M27 8H135Q141 8 145 16L158 29 147 50Q144 54 134 54H25Q14 54 12 49L2 29 13 11Q16 6 27 8Z" stroke="url(#rim)" stroke-opacity=".48" stroke-width="1.5"/>
+<path d="M26 12H132Q141 12 144 20L154 29 144 47Q141 50 132 50H27Q18 50 15 43L6 29 16 17Q19 12 26 12Z" fill="url(#surface)" stroke="url(#rim)" stroke-width="2.6"/>
+<path d="M30 15H130Q138 15 140 21L149 29 139 44Q137 47 130 47H29Q22 47 20 41L12 29 21 19Q23 15 30 15Z" stroke="#ffe482" stroke-opacity=".16" stroke-width=".8"/>
+<path d="M8 23 14 12Q17 9 24 9H31L36 12 M125 50H136Q143 50 146 43L153 32 M16 44 20 49H36L41 47" stroke="#ffe482" stroke-opacity=".75" stroke-width="1.1" stroke-linecap="round"/>
+<path d="M10 25 13 29 10 33 7 29Z M150 25 153 29 150 33 147 29Z" fill="#ffe482"/>
+</svg>
