@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css" />
+  <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <header class="topbar">
@@ -85,7 +86,22 @@
           <div class="profile-topline">
             <div class="profile-name-group">
               <h2 id="profileName">User User</h2>
-              <div class="streak-badge-host" id="streakBadgeHost"></div>
+              <!-- streak badge v2 -->
+              <div
+                class="streak-badge streak-badge--tier-0"
+                id="streakBadgeHost"
+                title="Daily streak: 0 days"
+              >
+                <div class="streak-badge__frame">
+                  <span class="streak-badge__icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path class="streak-badge__flame-outer" d="M12 1.6c1.5 3.1 1.2 4.6 2.5 6.4 1.1 1.5 2.5 2.9 2.5 5.2a5 5 0 0 1-10 0c0-2 .9-3.2 2.1-4.4-.1 1.5.4 2.3 1 2.7-.2-2.7.6-5.8 1.9-9.9Z" />
+                      <path class="streak-badge__flame-inner" d="M12 10.5c1.3 1.5 2 2.6 2 3.7a2 2 0 0 1-4 0c0-1.1.7-2.2 2-3.7Z" />
+                    </svg>
+                  </span>
+                  <span class="streak-badge__value">0 days</span>
+                </div>
+              </div>
             </div>
             <button class="secondary-btn" id="editProfileBtn">Edit</button>
           </div>
@@ -254,7 +270,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="firebase.init.js"></script>
-  <script src="app.js"></script>
+  <script src="firebase.init.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

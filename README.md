@@ -64,7 +64,7 @@ creates the Firebase user, later ones just sign it in.
   (`READING LEVEL UP — Lv. 4 → Lv. 5`); two level-ups play one after the other. The one goal
   reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
   in `styles.css` and are reduced under `prefers-reduced-motion`.
-- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00.
+- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00. The badge markup ships in the page HTML and `app.js` only swaps the tier class and the day count, so the badge still renders when a stale cached script fails to run.
 - Optional sign-in via a dedicated `login.html` page with a "Continue with Google" button, syncing progress across devices (last-write-wins).
 - Responsive layout.
 
@@ -144,3 +144,9 @@ The site is purely static — no server needed:
    main / root.**
 3. The app is then live at `https://<your-username>.github.io/<repo>/` with HTTPS.
 4. Add `your-username.github.io` to the Firebase **Authorized domains** (step 6 above).
+5. GitHub Pages serves files with a 10 minute cache, so a fresh deploy can still look like it
+   did not land. Every own asset is referenced with a `?v=N` query in `index.html`, `login.html`
+   and `skill.html` — bump `N` on each deploy to force browsers to refetch. To confirm a
+   deploy, open `https://<your-username>.github.io/<repo>/?v=2` (the extra query bypasses the
+   cached page itself) and fall back to `Ctrl+Shift+R`. The HTML comment in the profile card
+   (`<!-- streak badge v2 -->`) shows which build is live.

@@ -253,6 +253,8 @@ const STREAK_TIERS = [
 
 // Two flat shapes, not a photo flame: angular orange body plus a
 // smaller yellow core. Static SVG, so the tier look comes from CSS.
+// index.html and skill.html carry the canonical copy; this is the
+// fallback for hosts that ship without badge markup.
 const STREAK_FLAME_SVG = [
   '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
   '<path class="streak-badge__flame-outer" d="M12 1.6c1.5 3.1 1.2 4.6 2.5 6.4 1.1 1.5 2.5 2.9 2.5 5.2a5 5 0 0 1-10 0c0-2 .9-3.2 2.1-4.4-.1 1.5.4 2.3 1 2.7-.2-2.7.6-5.8 1.9-9.9Z"/>',
@@ -283,12 +285,16 @@ function getStreakTier(streak) {
 }
 
 
-// Mounts the badge markup once and then only swaps tier + text,
-// so the same badge can be reused anywhere in the profile UI.
-function createStreakBadge(host) {
-  if (!host) {
-    return null;
-  }
+// Fallback for hosts without badge markup of their own: builds the
+// same structure index.html and skill.html declare.
+function buildStreakFrame() {
+  const frame =
+    document.createElement(
+      "div"
+    );
+
+  frame.className =
+    "streak-badge__frame";
 
   const icon =
     document.createElement(
@@ -309,20 +315,53 @@ function createStreakBadge(host) {
   value.className =
     "streak-badge__value";
 
-  const frame =
-    document.createElement(
-      "div"
-    );
-
-  frame.className =
-    "streak-badge__frame";
-
   frame.append(
     icon,
     value
   );
 
-  host.append(frame);
+  return frame;
+}
+
+
+// Reuses the badge markup that already ships inside the host and
+// then only swaps tier + text, so the badge can be reused anywhere.
+// The markup lives in the HTML rather than here, which keeps the
+// badge on screen even when this script never runs - that is the
+// exact state a stale cached app.js leaves behind.
+function createStreakBadge(host) {
+  if (!host) {
+    return null;
+  }
+
+  let frame =
+    host.querySelector(
+      ".streak-badge__frame"
+    );
+
+  if (!frame) {
+    frame =
+      buildStreakFrame();
+
+    host.append(frame);
+  }
+
+  let value =
+    frame.querySelector(
+      ".streak-badge__value"
+    );
+
+  if (!value) {
+    value =
+      document.createElement(
+        "span"
+      );
+
+    value.className =
+      "streak-badge__value";
+
+    frame.append(value);
+  }
 
   return {
     render(streak) {
@@ -334,9 +373,17 @@ function createStreakBadge(host) {
           ? "day"
           : "days";
 
-      host.className =
-        `streak-badge ` +
-        `streak-badge--tier-${getStreakTier(count)}`;
+      const tier =
+        getStreakTier(count);
+
+      STREAK_TIERS.forEach(
+        (step) => {
+          host.classList.toggle(
+            `streak-badge--tier-${step.tier}`,
+            step.tier === tier
+          );
+        }
+      );
 
       host.title =
         `Daily streak: ${count} ${days}`;
