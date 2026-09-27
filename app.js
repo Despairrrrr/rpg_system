@@ -274,6 +274,391 @@ function getLevelInfo(xp) {
 }
 
 
+// Player XP is the sum of every skill XP, so one goal reward
+// advances the linked skill and the player in a single step.
+function getTotalPlayerXp() {
+  return state.skills.reduce(
+    (sum, skill) =>
+      sum + (Number(skill.xp) || 0),
+    0
+  );
+}
+
+
+// ===============================
+// MOTION
+// ===============================
+
+// Durations live in CSS (--motion-*). They are read back here so the
+// animation code never hardcodes its own timings.
+const motionFallbackMs = {
+  check: 200,
+  float: 800,
+  bar: 700,
+  levelup: 1200,
+};
+
+function getMotionMs(name) {
+  const raw =
+    getComputedStyle(
+      document.documentElement
+    ).getPropertyValue(
+      `--motion-${name}`
+    );
+
+  const value =
+    Number.parseFloat(raw);
+
+  return Number.isFinite(value) && value > 0
+    ? value
+    : motionFallbackMs[name];
+}
+
+
+// ===============================
+// COMPLETION FEEDBACK
+// ===============================
+
+let fxLayer = null;
+
+let toastLayer = null;
+
+// Both layers are decorative and sit above the page, but they never
+// take pointer input, so a completion can never block the UI.
+function ensureFxLayers() {
+  if (!fxLayer?.isConnected) {
+    fxLayer =
+      document.createElement("div");
+
+    fxLayer.className = "fx-layer";
+
+    fxLayer.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    document.body.append(fxLayer);
+  }
+
+  if (!toastLayer?.isConnected) {
+    toastLayer =
+      document.createElement("div");
+
+    toastLayer.className = "toast-layer";
+
+    toastLayer.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    document.body.append(toastLayer);
+  }
+}
+
+
+// "+10 XP" near the completed goal, then gone.
+function showFloatingXp(
+  rect,
+  xp
+) {
+  if (
+    !rect ||
+    !(xp > 0)
+  ) {
+    return;
+  }
+
+  ensureFxLayers();
+
+  const float =
+    document.createElement("span");
+
+  float.className = "xp-float";
+
+  float.textContent =
+    `+${xp} XP`;
+
+  float.style.left =
+    `${rect.left + rect.width / 2}px`;
+
+  float.style.top =
+    `${rect.top + 10}px`;
+
+  const remove = () =>
+    float.remove();
+
+  fxLayer.append(float);
+
+  float.addEventListener(
+    "animationend",
+    remove,
+    { once: true }
+  );
+
+  setTimeout(
+    remove,
+    getMotionMs("float") + 200
+  );
+}
+
+
+// Level-ups are queued so several events from one completion play
+// in sequence instead of stacking on top of each other.
+const levelUpQueue = [];
+
+let levelUpBusy = false;
+
+function queueLevelUp(item) {
+  levelUpQueue.push(item);
+
+  drainLevelUpQueue();
+}
+
+function drainLevelUpQueue() {
+  if (levelUpBusy) {
+    return;
+  }
+
+  levelUpBusy = true;
+
+  (async () => {
+    try {
+      while (levelUpQueue.length > 0) {
+        await showLevelUp(
+          levelUpQueue.shift()
+        );
+      }
+    } finally {
+      levelUpBusy = false;
+    }
+  })();
+}
+
+function showLevelUp({
+  kicker,
+  from,
+  to,
+}) {
+  ensureFxLayers();
+
+  return new Promise((resolve) => {
+    const toast =
+      document.createElement("div");
+
+    toast.className =
+      "level-toast";
+
+    const label =
+      document.createElement("span");
+
+    label.className =
+      "level-toast-kicker";
+
+    label.textContent = kicker;
+
+    const value =
+      document.createElement("span");
+
+    value.className =
+      "level-toast-value";
+
+    value.textContent =
+      `Lv. ${from} → Lv. ${to}`;
+
+    toast.append(
+      label,
+      value
+    );
+
+    toastLayer.append(toast);
+
+    let settled = false;
+
+    const done = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      toast.remove();
+
+      resolve();
+    };
+
+    toast.addEventListener(
+      "animationend",
+      (event) => {
+        if (event.target === toast) {
+          done();
+        }
+      }
+    );
+
+    setTimeout(
+      done,
+      getMotionMs("levelup") + 120
+    );
+  });
+}
+
+
+// How much of its track a fill currently covers (0-100). Used to take
+// the animation start value straight from what is on screen, so a
+// click during a running animation stays smooth.
+function readFillPercent(fill) {
+  const track = fill?.parentElement;
+
+  const trackWidth =
+    track?.clientWidth ?? 0;
+
+  const fillWidth =
+    fill?.getBoundingClientRect().width ??
+    0;
+
+  if (
+    !trackWidth ||
+    !fillWidth
+  ) {
+    return null;
+  }
+
+  return (fillWidth / trackWidth) * 100;
+}
+
+function animateFill(
+  fill,
+  fromPercent,
+  toPercent
+) {
+  if (!fill) {
+    return;
+  }
+
+  const target =
+    Math.max(
+      0,
+      Math.min(100, toPercent)
+    );
+
+  const start =
+    fromPercent == null
+      ? target
+      : Math.max(
+          0,
+          Math.min(100, fromPercent)
+        );
+
+  fill.classList.remove("is-animating");
+
+  if (
+    Math.abs(target - start) < 0.05
+  ) {
+    fill.style.width = `${target}%`;
+
+    return;
+  }
+
+  fill.style.width = `${start}%`;
+
+  // Force the start width to be applied before the transition is
+  // enabled, otherwise the bar jumps instead of animating.
+  void fill.offsetWidth;
+
+  fill.classList.add("is-animating");
+
+  fill.style.width = `${target}%`;
+}
+
+
+// One click can produce several events: the goal itself, a skill
+// level-up and a player level-up. This plays them in order.
+function runCompletionFeedback(
+  fx,
+  events
+) {
+  if (!fx.awarded) {
+    return;
+  }
+
+  showFloatingXp(
+    fx.rect,
+    fx.xp
+  );
+
+  animateFill(
+    els.xpBar,
+    fx.fromPlayerPercent,
+    fx.toPlayerPercent
+  );
+
+  if (fx.skillId) {
+    animateFill(
+      document.querySelector(
+        `.skill-row[data-id="${CSS.escape(fx.skillId)}"] .skill-fill`
+      ),
+      fx.fromSkillPercent,
+      fx.toSkillPercent
+    );
+  }
+
+  playCheckPop(fx.goalId);
+
+  const levelUps = [];
+
+  if (events.skill) {
+    levelUps.push({
+      kicker:
+        `${events.skill.name} LEVEL UP`.toUpperCase(),
+      from: events.skill.from,
+      to: events.skill.to,
+    });
+  }
+
+  if (events.player) {
+    levelUps.push({
+      kicker: "LEVEL UP",
+      from: events.player.from,
+      to: events.player.to,
+    });
+  }
+
+  if (levelUps.length === 0) {
+    return;
+  }
+
+  // The bars land first, then the level-up confirms the result.
+  setTimeout(() => {
+    levelUps.forEach(queueLevelUp);
+  }, getMotionMs("bar"));
+}
+
+
+// The re-render replaces the goal node, so the check pop is replayed
+// on the new one to cover the instant state change.
+function playCheckPop(goalId) {
+  const selector =
+    `.goal-card[data-id="${CSS.escape(goalId)}"] .goal-check, ` +
+    `.goal-tree-item[data-id="${CSS.escape(goalId)}"] .goal-check`;
+
+  document
+    .querySelectorAll(selector)
+    .forEach((check) => {
+      check.classList.remove("is-pop");
+
+      void check.offsetWidth;
+
+      check.classList.add("is-pop");
+
+      setTimeout(
+        () =>
+          check.classList.remove("is-pop"),
+        getMotionMs("check") + 60
+      );
+    });
+}
+
+
 // ===============================
 // PROFILE
 // ===============================
@@ -288,11 +673,7 @@ function renderProfile() {
   els.streakFlame.hidden =
     state.streak.count <= 0;
 
-  const totalXP = state.skills.reduce(
-    (sum, skill) =>
-      sum + Number(skill.xp || 0),
-    0
-  );
+  const totalXP = getTotalPlayerXp();
 
   const info =
     getLevelInfo(totalXP);
@@ -314,6 +695,38 @@ function renderProfile() {
 // ===============================
 // GOALS RENDER
 // ===============================
+
+// Recurring goals can be re-done, so the chip says when the last
+// completion happened. Everything else just reads as finished.
+function getGoalStateLabel(goal) {
+  if (goal.type === "daily") {
+    return goal.completedDay === getDayKey()
+      ? "Done today"
+      : "Done";
+  }
+
+  return "Completed";
+}
+
+function renderGoalState(
+  card,
+  goal
+) {
+  const chip =
+    card.querySelector(".goal-state");
+
+  if (!chip) {
+    return;
+  }
+
+  chip.hidden = !goal.completed;
+
+  chip.textContent =
+    goal.completed
+      ? getGoalStateLabel(goal)
+      : "";
+}
+
 
 function renderGoals() {
   const query =
@@ -463,12 +876,15 @@ function renderGoals() {
         );
       }
 
+      renderGoalState(card, goal);
+
       checkbox.addEventListener(
         "change",
         () => {
           toggleGoalCompletion(
             goal.id,
-            checkbox.checked
+            checkbox.checked,
+            card
           );
         }
       );
@@ -838,6 +1254,8 @@ function renderGoalTreeNode(
   item.className =
     `goal-tree-item ${goal.type}`;
 
+  item.dataset.id = goal.id;
+
   if (goal.completed) {
     item.classList.add(
       "completed"
@@ -909,6 +1327,14 @@ function renderGoalTreeNode(
 
   item.append(desc);
 
+  const chip = document.createElement("p");
+
+  chip.className = "goal-state";
+
+  item.append(chip);
+
+  renderGoalState(item, goal);
+
   const actions =
     document.createElement("div");
 
@@ -945,7 +1371,8 @@ function renderGoalTreeNode(
     () => {
       toggleGoalCompletion(
         goal.id,
-        input.checked
+        input.checked,
+        item
       );
     }
   );
@@ -1020,6 +1447,8 @@ function createGoal(data) {
     completed:
       false,
 
+    completedDay: "",
+
     createdAt:
       new Date()
         .toISOString(),
@@ -1036,9 +1465,15 @@ function createGoal(data) {
 
 
 // TOGGLE COMPLETION
+//
+// The goal reward is applied once, to the linked skill, and the
+// player total follows from it because the player XP is the sum of
+// all skill XP. A click that would not change the goal is ignored,
+// so XP can never be awarded twice.
 function toggleGoalCompletion(
   goalId,
-  completed
+  completed,
+  anchorEl = null
 ) {
   const goal =
     state.goals.find(
@@ -1050,36 +1485,123 @@ function toggleGoalCompletion(
     return;
   }
 
+  const wasCompleted =
+    Boolean(goal.completed);
+
+  if (wasCompleted === completed) {
+    return;
+  }
+
   const skill =
     state.skills.find(
       (item) =>
         item.id === goal.skillId
     );
 
-  const xp =
-    Number(goal.xp) || 0;
+  const xp = Number(goal.xp) || 0;
+
+  const prevSkillXp =
+    Number(skill?.xp) || 0;
+
+  const prevPlayerXp =
+    getTotalPlayerXp();
+
+  const delta =
+    completed ? xp : -xp;
+
+  const nextSkillXp =
+    Math.max(0, prevSkillXp + delta);
+
+  // Derived from the clamped skill value, not the nominal delta, so
+  // the player total can never disagree with the sum of all skills.
+  const nextPlayerXp =
+    prevPlayerXp +
+    (nextSkillXp - prevSkillXp);
+
+  // What the bars look like right now, before the re-render throws
+  // the current nodes away.
+  const skillFill =
+    skill
+      ? document.querySelector(
+          `.skill-row[data-id="${CSS.escape(skill.id)}"] .skill-fill`
+        )
+      : null;
+
+  const fx = {
+    goalId: goal.id,
+    awarded:
+      completed &&
+      Boolean(skill) &&
+      xp > 0,
+    xp,
+    rect:
+      anchorEl?.getBoundingClientRect() ??
+      null,
+    skillId: skill?.id ?? null,
+    fromSkillPercent:
+      readFillPercent(skillFill),
+    toSkillPercent:
+      getLevelInfo(nextSkillXp)
+        .progress,
+    fromPlayerPercent:
+      readFillPercent(els.xpBar),
+    toPlayerPercent:
+      getLevelInfo(nextPlayerXp)
+        .progress,
+  };
+
+  const events = {
+    skill: null,
+    player: null,
+  };
 
   if (skill) {
-    skill.xp = Math.max(
-      0,
-      (Number(skill.xp) || 0) +
-        (completed ? xp : -xp)
-    );
+    const prevLevel =
+      getLevelInfo(prevSkillXp).level;
+
+    const nextLevel =
+      getLevelInfo(nextSkillXp).level;
+
+    if (nextLevel > prevLevel) {
+      events.skill = {
+        name: skill.name,
+        from: prevLevel,
+        to: nextLevel,
+      };
+    }
   }
 
-  if (
-    completed &&
-    !goal.completed
-  ) {
+  const prevPlayerLevel =
+    getLevelInfo(prevPlayerXp).level;
+
+  const nextPlayerLevel =
+    getLevelInfo(nextPlayerXp).level;
+
+  if (nextPlayerLevel > prevPlayerLevel) {
+    events.player = {
+      from: prevPlayerLevel,
+      to: nextPlayerLevel,
+    };
+  }
+
+  if (skill) {
+    skill.xp = nextSkillXp;
+  }
+
+  if (completed) {
     bumpStreak();
   }
 
-  goal.completed =
-    completed;
+  goal.completed = completed;
+
+  goal.completedDay =
+    completed ? getDayKey() : "";
 
   saveState();
 
   render();
+
+  runCompletionFeedback(fx, events);
 }
 
 

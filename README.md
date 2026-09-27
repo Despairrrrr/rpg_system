@@ -58,6 +58,12 @@ creates the Firebase user, later ones just sign it in.
 - Automatic goal counts.
 - Clicking a skill opens its detail page with a goal tree (parent long goals nest their children).
 - Exponential level/XP curve (reaching level N requires (N-1)^2 * 100 XP).
+- Completion feedback: the checkbox pops, the card switches to a dimmed "done" state with a
+  `Done today` chip, a `+XP` hint floats up from the card, and the skill and player bars animate
+  from their old values to the new ones. A skill or player level-up adds a compact toast
+  (`READING LEVEL UP — Lv. 4 → Lv. 5`); two level-ups play one after the other. The one goal
+  reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
+  in `styles.css` and are reduced under `prefers-reduced-motion`.
 - Daily streak: completing at least one goal per day grows an animated flame next to the profile name; missing a day resets it at local 00:00.
 - Optional sign-in via a dedicated `login.html` page with a "Continue with Google" button, syncing progress across devices (last-write-wins).
 - Responsive layout.
