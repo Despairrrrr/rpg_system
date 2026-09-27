@@ -156,6 +156,10 @@ function saveState() {
 // ===============================
 
 function render() {
+  // render() rebuilds every card, so an open menu would lose its
+  // anchor. Close it before the DOM it points at is replaced.
+  closeGoalMenu();
+
   checkStreakExpiry();
 
   renderProfile();
@@ -850,6 +854,418 @@ function renderProfile() {
 
 
 // ===============================
+// GOAL ACTIONS MENU
+// ===============================
+
+// Utility UI, not a reward. One shared element on <body> gives us
+// "only one menu open" for free, and position:fixed keeps it clear of
+// the goal column boxes, so it can neither be clipped by a card nor
+// reflow one. The items just call the existing goal handlers, which
+// stay the single source of CRUD behaviour.
+const GOAL_MENU_ITEMS = [
+  {
+    label: "Edit",
+    run: (goal) => {
+      openGoalModal(goal);
+    },
+  },
+  {
+    label: "Delete",
+    modifier: "goal-menu-item--danger",
+    run: (goal) => {
+      deleteGoal(goal.id);
+    },
+  },
+];
+
+const GOAL_MENU_GAP = 6;
+const GOAL_MENU_EDGE = 8;
+
+let goalMenu = null;
+
+
+function createGoalMenuItem(descriptor) {
+  const item =
+    document.createElement(
+      "button"
+    );
+
+  item.type = "button";
+  item.className =
+    descriptor.modifier
+      ? `goal-menu-item ${descriptor.modifier}`
+      : "goal-menu-item";
+
+  item.textContent =
+    descriptor.label;
+
+  item.setAttribute(
+    "role",
+    "menuitem"
+  );
+
+  item.tabIndex = -1;
+
+  return item;
+}
+
+
+// Right aligned under the trigger, flipped above when the viewport
+// ends first, then pulled back inside horizontally.
+function positionGoalMenu() {
+  const trigger =
+    goalMenu.trigger;
+
+  if (!trigger) {
+    return;
+  }
+
+  const anchor =
+    trigger.getBoundingClientRect();
+
+  const box =
+    goalMenu.el.getBoundingClientRect();
+
+  let top =
+    anchor.bottom +
+    GOAL_MENU_GAP;
+
+  let left =
+    anchor.right -
+    box.width;
+
+  if (
+    top + box.height >
+      window.innerHeight -
+      GOAL_MENU_EDGE
+  ) {
+    const above =
+      anchor.top -
+      box.height -
+      GOAL_MENU_GAP;
+
+    if (above >= GOAL_MENU_EDGE) {
+      top = above;
+    } else {
+      top = Math.max(
+        GOAL_MENU_EDGE,
+        Math.min(
+          top,
+          window.innerHeight -
+            box.height -
+            GOAL_MENU_EDGE
+        )
+      );
+    }
+  }
+
+  const maxLeft =
+    window.innerWidth -
+    box.width -
+    GOAL_MENU_EDGE;
+
+  left = Math.min(
+    Math.max(
+      left,
+      GOAL_MENU_EDGE
+    ),
+    Math.max(
+      GOAL_MENU_EDGE,
+      maxLeft
+    )
+  );
+
+  goalMenu.el.style.top =
+    `${Math.round(top)}px`;
+
+  goalMenu.el.style.left =
+    `${Math.round(left)}px`;
+}
+
+
+function openGoalMenu(trigger, goal) {
+  const menu =
+    getGoalMenu();
+
+  menu.trigger = trigger;
+  menu.goal = goal;
+
+  trigger.setAttribute(
+    "aria-expanded",
+    "true"
+  );
+
+  // Measured while still closed, which works because the menu stays
+  // in the layout via visibility rather than display.
+  positionGoalMenu();
+
+  menu.el.classList.add(
+    "is-open"
+  );
+
+  menu.items[0].focus();
+}
+
+
+function closeGoalMenu(returnFocus = false) {
+  const menu = goalMenu;
+
+  if (!menu?.el.classList.contains("is-open")) {
+    return;
+  }
+
+  menu.el.classList.remove(
+    "is-open"
+  );
+
+  const trigger =
+    menu.trigger;
+
+  if (trigger) {
+    trigger.setAttribute(
+      "aria-expanded",
+      "false"
+    );
+
+    if (returnFocus && trigger.isConnected) {
+      trigger.focus();
+    }
+  }
+
+  menu.trigger = null;
+  menu.goal = null;
+}
+
+
+function getGoalMenu() {
+  if (goalMenu) {
+    return goalMenu;
+  }
+
+  const el =
+    document.createElement(
+      "div"
+    );
+
+  el.className = "goal-menu";
+  el.setAttribute("role", "menu");
+  el.setAttribute(
+    "aria-label",
+    "Goal actions"
+  );
+
+  const items =
+    GOAL_MENU_ITEMS.map(
+      createGoalMenuItem
+    );
+
+  el.append(
+    ...items
+  );
+
+  document.body.append(el);
+
+  items.forEach(
+    (item, index) => {
+      item.addEventListener(
+        "click",
+        () => {
+          const goal =
+            goalMenu.goal;
+
+          closeGoalMenu();
+
+          if (goal) {
+            GOAL_MENU_ITEMS[index].run(goal);
+          }
+        }
+      );
+    }
+  );
+
+  el.addEventListener(
+    "keydown",
+    (event) => {
+      const index =
+        items.indexOf(
+          document.activeElement
+        );
+
+      if (index === -1) {
+        return;
+      }
+
+      const keys = {
+        ArrowDown: index + 1,
+        ArrowUp: index - 1,
+        Home: 0,
+        End: items.length - 1,
+      };
+
+      const next = keys[event.key];
+
+      if (next === undefined) {
+        if (event.key === "Tab") {
+          // Let focus leave, but hand it back to the trigger first,
+          // otherwise hiding the menu drops focus on <body>.
+          closeGoalMenu(true);
+        }
+
+        return;
+      }
+
+      event.preventDefault();
+
+      items[
+        (next + items.length) %
+        items.length
+      ].focus();
+    }
+  );
+
+  goalMenu = {
+    el,
+    items,
+    trigger: null,
+    goal: null,
+    frame: 0,
+  };
+
+  return goalMenu;
+}
+
+
+// Roving focus inside the menu, one trigger per card. Clicking the
+// same trigger again toggles it shut.
+function createGoalActionsMenu(trigger, goal) {
+  trigger.addEventListener(
+    "click",
+    () => {
+      const menu =
+        getGoalMenu();
+
+      if (
+        menu.trigger === trigger &&
+        menu.el.classList.contains("is-open")
+      ) {
+        closeGoalMenu();
+
+        return;
+      }
+
+      openGoalMenu(trigger, goal);
+    }
+  );
+
+  trigger.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key !== "ArrowDown" &&
+        event.key !== "ArrowUp"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      openGoalMenu(trigger, goal);
+
+      const items =
+        getGoalMenu().items;
+
+      items[
+        event.key === "ArrowDown"
+          ? 0
+          : items.length - 1
+      ].focus();
+    }
+  );
+
+  return trigger;
+}
+
+
+// Clicking away closes it. pointerdown rather than click, so a
+// touch tap outside dismisses before focus moves.
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (!goalMenu?.el.classList.contains("is-open")) {
+      return;
+    }
+
+    if (goalMenu.el.contains(event.target)) {
+      return;
+    }
+
+    if (goalMenu.trigger?.contains(event.target)) {
+      return;
+    }
+
+    closeGoalMenu();
+  }
+);
+
+
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (!goalMenu?.el.classList.contains("is-open")) {
+      return;
+    }
+
+    event.preventDefault();
+
+    closeGoalMenu(true);
+  }
+);
+
+
+// Scrolling or resizing moves the anchor, so re-measure instead of
+// leaving the menu behind. A re-rendered card loses its trigger, so
+// that case closes the menu.
+function keepGoalMenuAnchored() {
+  if (!goalMenu?.el.classList.contains("is-open")) {
+    return;
+  }
+
+  if (goalMenu.frame) {
+    return;
+  }
+
+  goalMenu.frame =
+    requestAnimationFrame(() => {
+      goalMenu.frame = 0;
+
+      if (!goalMenu.trigger?.isConnected) {
+        closeGoalMenu();
+
+        return;
+      }
+
+      positionGoalMenu();
+    });
+}
+
+
+window.addEventListener(
+  "scroll",
+  keepGoalMenuAnchored,
+  true
+);
+
+window.addEventListener(
+  "resize",
+  keepGoalMenuAnchored
+);
+
+
+// ===============================
 // GOALS RENDER
 // ===============================
 
@@ -1046,22 +1462,11 @@ function renderGoals() {
         }
       );
 
-      card.querySelector(
-        ".edit-goal"
-      ).addEventListener(
-        "click",
-        () => {
-          openGoalModal(goal);
-        }
-      );
-
-      card.querySelector(
-        ".delete-goal"
-      ).addEventListener(
-        "click",
-        () => {
-          deleteGoal(goal.id);
-        }
+      createGoalActionsMenu(
+        card.querySelector(
+          ".goal-menu-trigger"
+        ),
+        goal
       );
 
       list.append(card);

@@ -65,6 +65,13 @@ creates the Firebase user, later ones just sign it in.
   reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
   in `styles.css` and are reduced under `prefers-reduced-motion`.
 - Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00. The badge markup ships in the page HTML and `app.js` only swaps the tier class and the day count, so the badge still renders when a stale cached script fails to run.
+- Goal maintenance actions live behind one `···` trigger per goal card instead of permanent
+  Edit/Delete buttons, which keeps the card quiet next to completion, title and XP. The menu is a
+  single `position: fixed` element on `<body>` (`role="menu"`, `aria-haspopup` /
+  `aria-expanded` on the trigger), anchored right-aligned under the trigger, flipped above when
+  the viewport ends first, with arrow-key roaming, `Escape` to close and focus back on the
+  trigger, and a click-away to dismiss. It calls `openGoalModal()` / `deleteGoal()` unchanged, so
+  the `confirm()` on delete still applies. Skill rows and the goal tree keep their own buttons.
 - Optional sign-in via a dedicated `login.html` page with a "Continue with Google" button, syncing progress across devices (last-write-wins).
 - Responsive layout.
 
