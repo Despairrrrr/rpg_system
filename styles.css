@@ -10,6 +10,15 @@
   --green: #1df4a1;
   --yellow: #ffd51c;
   --red: #ff4f4f;
+
+  /* Goal roles (Step / Quest / Arc). These are a hierarchy, not a
+     status set, so they stay in the cool-to-warm game palette: cyan for
+     "do this now", violet for the mission, amber for the arc. Red is
+     reserved for destructive actions, yellow is avoided because it
+     reads as a warning. */
+  --goal-step: #27d9d0;
+  --goal-quest: #7c6cff;
+  --goal-arc: var(--orange);
   --radius: 16px;
   --shadow: 0 0 22px rgba(17, 147, 255, 0.08);
   /* Motion tokens: single source of truth for CSS and app.js
@@ -251,7 +260,7 @@ button { cursor: pointer; }
 
 .goal-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 10px;
 }
 
@@ -266,10 +275,9 @@ button { cursor: pointer; }
   box-shadow: inset 0 0 28px color-mix(in srgb, currentColor 7%, transparent), 0 0 18px color-mix(in srgb, currentColor 11%, transparent);
 }
 
-.goal-column.daily { color: var(--green); }
-.goal-column.short { color: var(--blue); }
-.goal-column.medium { color: var(--yellow); }
-.goal-column.long { color: var(--red); }
+.goal-column.step { color: var(--goal-step); }
+.goal-column.quest { color: var(--goal-quest); }
+.goal-column.arc { color: var(--goal-arc); }
 
 .column-header h2 {
   margin: 0 0 4px;
@@ -447,6 +455,7 @@ button { cursor: pointer; }
 .goal-card.completed .goal-description,
 .goal-card.completed .goal-skill,
 .goal-card.completed .goal-parent,
+.goal-card.completed .goal-repeat-badge,
 .goal-tree-item.completed .goal-tree-desc {
   opacity: 0.82;
 }
@@ -477,6 +486,27 @@ button { cursor: pointer; }
   background: currentColor;
   box-shadow: 0 0 6px currentColor;
 }
+
+/* "↻ Daily" marker for a goal that comes back every day. It is a fact
+   about the goal, not a reward, so it stays deliberately quiet: no
+   accent color of its own, and never louder than the title or the XP. */
+.goal-repeat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: -2px 0 10px 28px;
+  padding: 2px 9px;
+  border: 1px solid rgba(126, 196, 220, 0.26);
+  border-radius: 999px;
+  background: rgba(126, 196, 220, 0.05);
+  color: #7fa8bd;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.goal-repeat-badge[hidden] { display: none; }
 
 .goal-card-actions,
 .skill-actions {
@@ -1032,6 +1062,12 @@ button { cursor: pointer; }
   font-size: 13px;
 }
 
+/* .modal-card label sets display, which would beat the user-agent
+   [hidden] rule, so hidden fields are turned off explicitly. */
+.modal-card label[hidden] {
+  display: none;
+}
+
 .modal-card input,
 .modal-card textarea,
 .modal-card select {
@@ -1050,6 +1086,55 @@ button { cursor: pointer; }
 .modal-card select:focus {
   border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(32, 185, 255, 0.11);
+}
+
+/* Placeholder stays at the muted end of the palette, so guidance text
+   never competes with what has actually been typed. */
+.modal-card input::placeholder,
+.modal-card textarea::placeholder {
+  color: #6d8496;
+  opacity: 1;
+}
+
+/* One line naming the selected role, in that role's accent color. The
+   detailed guidance stays in the title placeholder above. */
+.modal-card .type-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 7px 0 0;
+  color: var(--goal-step);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.modal-card .type-hint::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.modal-card .type-hint[data-type="quest"] { color: var(--goal-quest); }
+.modal-card .type-hint[data-type="arc"] { color: var(--goal-arc); }
+
+/* A real checkbox keeps the form free of any toggle state of its own. */
+.modal-card label.goal-repeat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.modal-card .goal-repeat input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
 }
 
 .modal-actions {
@@ -1106,10 +1191,9 @@ button { cursor: pointer; }
   margin-top: 10px;
 }
 
-.goal-tree-item.daily { color: var(--green); }
-.goal-tree-item.short { color: var(--blue); }
-.goal-tree-item.medium { color: var(--yellow); }
-.goal-tree-item.long { color: var(--red); }
+.goal-tree-item.step { color: var(--goal-step); }
+.goal-tree-item.quest { color: var(--goal-quest); }
+.goal-tree-item.arc { color: var(--goal-arc); }
 
 .goal-tree-top {
   display: flex;

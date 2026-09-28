@@ -25,7 +25,8 @@ The application keeps one `state` object:
     name: "User User"
   },
   goals: [],
-  skills: []
+  skills: [],
+  schemaVersion: 2
 }
 ```
 
@@ -35,13 +36,29 @@ A goal looks like this:
 {
   id: "uuid",
   title: "Read 20 pages",
-  type: "daily",
+  type: "step",          // "step" | "quest" | "arc"
+  repeatsDaily: true,    // only "step" and "quest" may set this
+  skillId: "uuid",
+  parentGoalId: "",      // optional; a step may sit under a quest or an arc
   description: "Before bed",
   xp: 10,
   completed: false,
+  completedDay: "",
   createdAt: "2026-09-22T18:00:00.000Z"
 }
 ```
+
+The three types describe how big a goal is, not how often it repeats. Recurrence lives in
+`repeatsDaily`, so a daily quest is still a quest:
+
+| Type | Meaning | May repeat daily | May be a child of |
+|---|---|---|---|
+| `step` | A concrete action you can start now | yes | quest, arc |
+| `quest` | A meaningful outcome you are working toward | yes | arc |
+| `arc` | A larger direction that can contain several quests | no | nothing |
+
+A goal is only ever one level deep: steps and quests hang off a goal, and that goal is
+always an arc. A parent is optional, and it must belong to the same skill.
 
 A skill looks like this:
 
@@ -67,16 +84,36 @@ const STORAGE_KEY = "neonGoalTracker.v1";
 
 ```js
 function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved ? JSON.parse(saved) : defaultState;
+  return migrateState(readStoredState());
 }
 ```
+
+`migrateState()` upgrades a stored document written by an older version of the app:
+
+| Old | New |
+|---|---|
+| `type: "short"` | `type: "step"` |
+| `type: "medium"` | `type: "quest"` |
+| `type: "long"` | `type: "arc"` |
+| `type: "daily"` | `type: "step"`, `repeatsDaily: true` |
+
+It also re-resolves `parentGoalId` values against the new type rules and clears any link
+that is no longer legal (missing goal, deleted goal, a cycle, or a parent that is now the
+wrong type). Goals are never dropped by a migration.
+
+Migration runs on every read, including a pull from the cloud, and is idempotent: running
+it on an already migrated document changes nothing. It deliberately does not save, because
+writing during a read would bump `updatedAt` and make a stale local document look newer
+than the cloud copy. The new shape is written out with the next real change.
 
 ## Save state
 
 ```js
 function saveState() {
+  state.updatedAt = Date.now();
+
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  queueCloudSync();
 }
 ```
 
@@ -103,17 +140,28 @@ function createGoal(data) {
     id: crypto.randomUUID(),
     title: data.title.trim(),
     type: data.type,
+    repeatsDaily: data.repeatsDaily,
     skillId: data.skillId,
-    parentGoalId: data.parentGoalId, // optional long goal
+    parentGoalId: data.parentGoalId, // optional arc, or quest for a step
     description: data.description.trim(),
     xp: Number(data.xp) || 0,
     completed: false,
+    completedDay: "",
     createdAt: new Date().toISOString(),
   });
 
+  syncGoalParents();
   saveState();
   render();
 }
+```
+
+The form hands over already validated data: `buildGoalPatch()` trims the title, drops
+`repeatsDaily` for an arc, and blanks a parent that is not a legal parent for the chosen
+type, so the model never has to repair an illegal shape it was given.
+
+```js
+syncGoalParents(); // re-resolves parentGoalId after any change
 ```
 
 Flow:
@@ -150,10 +198,15 @@ And rendered into the correct column:
 visible.forEach((goal) => {
   // clone template
   // insert title, description, XP
+  // show the "Daily" badge when goal.repeatsDaily
   // attach edit/delete events
   // append card
 });
 ```
+
+The dashboard has one column per type (`STEPS`, `QUESTS`, `ARCS`) and the skill page nests
+the same goals under their arc. A repeating goal is marked with a `↻ Daily` badge in both
+places, which is the only visual difference between a repeating and a one off goal.
 
 No explicit server `GET` request exists because this version has no backend.
 
@@ -169,6 +222,7 @@ function updateGoal(id, patch) {
   if (!goal) return;
 
   Object.assign(goal, patch);
+  syncGoalParents();
   saveState();
   render();
 }
@@ -180,10 +234,16 @@ Editing a goal uses:
 updateGoal(id, {
   title,
   type,
+  repeatsDaily,
+  parentGoalId,
   description,
   xp
 });
 ```
+
+`updateGoal()` does not fail when a change makes a goal an illegal parent. If an arc is
+edited into a step, the goals that pointed at it simply lose that link and become top level
+goals; they are never deleted.
 
 Completing a goal uses exactly the same CRUD operation:
 
@@ -202,12 +262,14 @@ This is useful because UI interactions do not need separate update functions for
 ```js
 function deleteGoal(id) {
   state.goals = state.goals.filter((item) => item.id !== id);
+  syncGoalParents();
   saveState();
   render();
 }
 ```
 
-A confirmation dialog is shown before the delete is executed.
+A confirmation dialog is shown before the delete is executed. `syncGoalParents()` then heals
+the goals that pointed at the deleted one: they stay, and their `parentGoalId` becomes `""`.
 
 ---
 
@@ -327,6 +389,11 @@ Profile XP is the sum of all skill XP. Goal XP is awarded to the linked skill on
 ```js
 const totalXP = skills.reduce((sum, s) => sum + s.xp, 0);
 ```
+
+The type of a goal never changes what it pays out. XP is stored on the goal, so editing a
+step into an arc, completing a repeating goal twice on different days, or un-completing a
+goal all move exactly the same amount of XP. The daily streak follows the same rule: only a
+goal with `repeatsDaily: true` counts toward it, whatever its type.
 
 Progression is exponential: reaching level N requires (N-1)^2 * 100 total XP.
 

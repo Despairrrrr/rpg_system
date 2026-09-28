@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body data-page="skill">
   <header class="topbar">
@@ -93,17 +93,22 @@
 
       <label>
         Title
-        <input id="goalTitle" required maxlength="80" placeholder="e.g. Read 20 pages" />
+        <input id="goalTitle" required maxlength="80" placeholder="A concrete action you can start now" />
       </label>
 
       <label>
         Type
         <select id="goalType" required>
-          <option value="daily">Daily</option>
-          <option value="short">Short</option>
-          <option value="medium">Medium</option>
-          <option value="long">Long</option>
+          <option value="step">Step</option>
+          <option value="quest">Quest</option>
+          <option value="arc">Arc</option>
         </select>
+        <p class="type-hint" id="goalTypeHint" data-type="step">Concrete action</p>
+      </label>
+
+      <label class="goal-repeat" id="goalRepeatField">
+        <input type="checkbox" id="goalRepeat" />
+        <span>Repeat daily</span>
       </label>
 
       <label>
@@ -113,10 +118,10 @@
         </select>
       </label>
 
-      <label>
-        Parent goal
+      <label id="goalParentField">
+        Part of
         <select id="goalParent">
-          <option value="">No parent goal</option>
+          <option value="">None</option>
         </select>
       </label>
 
@@ -205,6 +210,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase.init.js?v=2"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

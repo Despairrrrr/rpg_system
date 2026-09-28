@@ -12,6 +12,289 @@ const defaultState = {
   skills: [],
 };
 
+// ===============================
+// GOAL MODEL V2
+// ===============================
+// A goal has a role, and it may repeat. Those are two different
+// questions, so they are two different fields: Step / Quest / Arc
+// describe what the goal is for, `repeatsDaily` answers "does it come
+// back tomorrow?".
+//
+// Everything in this block is pure (no DOM, no `state`), so the
+// model can be reasoned about and tested on its own.
+// <goal-model>
+const goalTypes =
+  ["step", "quest", "arc"];
+
+const goalTypeOrder = {
+  step: 0,
+  quest: 1,
+  arc: 2,
+};
+
+// The one place the three roles are described. The placeholder is the
+// guidance in the form: it changes with the selected type and goes
+// away as soon as the user types.
+const goalTypeMeta = {
+  step: {
+    label: "STEP",
+
+    hint: "Concrete action",
+
+    placeholder:
+      "A concrete action you can start now",
+  },
+
+  quest: {
+    label: "QUEST",
+
+    hint: "Meaningful outcome",
+
+    placeholder:
+      "A meaningful outcome you're working toward",
+  },
+
+  arc: {
+    label: "ARC",
+
+    hint: "Larger direction",
+
+    placeholder:
+      "A larger direction that can contain multiple quests",
+  },
+};
+
+// Rewards are unchanged, they only moved with their type. Step now
+// carries the old Daily options (10/15/30) next to the old Short ones
+// (50/100/125), because both of those goals are Steps today.
+const goalXpOptions = {
+  step: [10, 15, 30, 50, 100, 125],
+
+  quest: [200, 350, 500],
+
+  arc: [1000, 2000, 5000],
+};
+
+// The only legal nestings. A parent is always optional, so an empty
+// list (Arc) means "cannot have one", never "must have one".
+const goalParentTypes = {
+  step: ["quest", "arc"],
+
+  quest: ["arc"],
+
+  arc: [],
+};
+
+// Goal model v1. Daily used to be a type of its own, which mixed
+// recurrence into the role; the other three were named after a size.
+const legacyGoalTypes = {
+  daily: {
+    type: "step",
+    repeatsDaily: true,
+  },
+
+  short: {
+    type: "step",
+    repeatsDaily: false,
+  },
+
+  medium: {
+    type: "quest",
+    repeatsDaily: false,
+  },
+
+  long: {
+    type: "arc",
+    repeatsDaily: false,
+  },
+};
+
+const SCHEMA_VERSION = 2;
+
+function getGoalTypeMeta(type) {
+  return (
+    goalTypeMeta[type] ??
+    goalTypeMeta.step
+  );
+}
+
+function isRepeatingGoal(goal) {
+  return Boolean(goal?.repeatsDaily);
+}
+
+// Only Step and Quest repeat. An Arc is a direction, not an action to
+// put on a daily to-do list.
+function canGoalRepeatDaily(type) {
+  return (
+    type === "step" ||
+    type === "quest"
+  );
+}
+
+function isCompatibleParentType(
+  childType,
+  parentType
+) {
+  return (
+    goalParentTypes[childType] ??
+    []
+  ).includes(parentType);
+}
+
+function findGoalById(
+  goals,
+  id
+) {
+  if (!id) {
+    return null;
+  }
+
+  return (
+    goals.find((goal) =>
+      goal.id === id
+    ) ?? null
+  );
+}
+
+// Returns a parent id that is legal under the new hierarchy, or "".
+// Nothing is invented here: a link that cannot be kept (wrong type,
+// gone, another skill, itself) is dropped so the goal simply becomes a
+// root. Never the other way round — the goal is never dropped.
+function resolveParentId(
+  goals,
+  goal
+) {
+  const parent = findGoalById(
+    goals,
+    goal.parentGoalId
+  );
+
+  if (!parent) {
+    return "";
+  }
+
+  if (parent.id === goal.id) {
+    return "";
+  }
+
+  if (
+    !isCompatibleParentType(
+      goal.type,
+      parent.type
+    )
+  ) {
+    return "";
+  }
+
+  // Goals are organised inside a skill, so the parent has to be one
+  // too. Matches the old rule, which also only offered parents from
+  // the selected skill.
+  if (
+    !goal.skillId ||
+    parent.skillId !== goal.skillId
+  ) {
+    return "";
+  }
+
+  return parent.id;
+}
+
+function normalizeGoalParents(
+  goals
+) {
+  return goals.map((goal) => {
+    const parentGoalId =
+      resolveParentId(goals, goal);
+
+    return parentGoalId ===
+      (goal.parentGoalId ?? "")
+      ? goal
+      : { ...goal, parentGoalId };
+  });
+}
+
+// Form values → the type-dependent part of a goal. Runs on both create
+// and edit, so an impossible combination (an Arc that repeats daily, a
+// Step under another Step) can never reach the state.
+function buildGoalPatch(
+  draft,
+  goals
+) {
+  const type =
+    goalTypeOrder[draft.type] ===
+    undefined
+      ? "step"
+      : draft.type;
+
+  return {
+    type,
+
+    repeatsDaily:
+      canGoalRepeatDaily(type) &&
+      Boolean(draft.repeatsDaily),
+
+    parentGoalId:
+      resolveParentId(goals, {
+        type,
+        id: draft.id ?? null,
+        parentGoalId: draft.parentGoalId ?? "",
+        skillId: draft.skillId ?? "",
+      }),
+  };
+}
+
+function migrateGoalType(goal) {
+  const legacy = legacyGoalTypes[goal.type];
+
+  if (legacy) {
+    return legacy;
+  }
+
+  return {
+    type:
+      goalTypeOrder[goal.type] ===
+      undefined
+        ? "step"
+        : goal.type,
+
+    repeatsDaily:
+      canGoalRepeatDaily(goal.type) &&
+      Boolean(goal.repeatsDaily),
+  };
+}
+
+// Short/Medium/Long became Step/Quest/Arc, Daily became a Step that
+// repeats. Title, description, skill, completion, XP and createdAt are
+// carried over untouched; parents are resolved afterwards, once every
+// goal already has its new type, so links that are still legal survive
+// and the rest are cleared instead of deleting anything.
+function migrateGoals(goals) {
+  const migrated = goals.map(
+    (goal) => ({
+      ...goal,
+      ...migrateGoalType(goal),
+    })
+  );
+
+  return normalizeGoalParents(
+    migrated
+  );
+}
+
+function migrateState(loaded) {
+  return {
+    ...loaded,
+
+    schemaVersion: SCHEMA_VERSION,
+
+    goals: migrateGoals(
+      loaded.goals ?? []
+    ),
+  };
+}
+// </goal-model>
+
+
 let state = loadState();
 
 const isSkillPage =
@@ -27,22 +310,6 @@ const currentSkillId =
   isSkillPage
     ? skillParams.get("id")
     : null;
-
-const goalTypes = ["daily", "short", "medium", "long"];
-
-const goalXpOptions = {
-  daily: [10, 15, 30],
-  short: [50, 100, 125],
-  medium: [200, 350, 500],
-  long: [1000, 2000, 5000],
-};
-
-const goalTypeOrder = {
-  daily: 0,
-  short: 1,
-  medium: 2,
-  long: 3,
-};
 
 const emptyText =
   "Add a goal for the coming weeks or months. This is your bridge to bigger achievements.";
@@ -60,9 +327,13 @@ const els = {
   goalId: document.querySelector("#goalId"),
   goalTitle: document.querySelector("#goalTitle"),
   goalType: document.querySelector("#goalType"),
+  goalTypeHint: document.querySelector("#goalTypeHint"),
+  goalRepeatField: document.querySelector("#goalRepeatField"),
+  goalRepeat: document.querySelector("#goalRepeat"),
   goalDescription: document.querySelector("#goalDescription"),
   goalXp: document.querySelector("#goalXp"),
   goalSkill: document.querySelector("#goalSkill"),
+  goalParentField: document.querySelector("#goalParentField"),
   goalParent: document.querySelector("#goalParent"),
 
   skillModal: document.querySelector("#skillModal"),
@@ -94,7 +365,10 @@ const els = {
 // LOCAL STORAGE
 // ===============================
 
-function loadState() {
+// Reads the persisted document exactly as it was written. Migration is
+// a separate pass, so an old document and a fresh one enter the app
+// through the same door and only the model differs.
+function readStoredState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
 
@@ -136,6 +410,17 @@ function loadState() {
 
     return structuredClone(defaultState);
   }
+}
+
+
+// Migration is idempotent and deliberately does not save: bumping
+// updatedAt here would make a stale local document look newer than the
+// cloud copy and lose the sign-in last-write-wins comparison. The
+// migrated shape is written out with the next real change.
+function loadState() {
+  return migrateState(
+    readStoredState()
+  );
 }
 
 
@@ -1270,15 +1555,35 @@ window.addEventListener(
 // ===============================
 
 // Recurring goals can be re-done, so the chip says when the last
-// completion happened. Everything else just reads as finished.
+// completion happened. Everything else just reads as finished. The
+// streak itself is driven by any completion, so it only has to keep
+// finding the repeating goals through isRepeatingGoal().
 function getGoalStateLabel(goal) {
-  if (goal.type === "daily") {
+  if (isRepeatingGoal(goal)) {
     return goal.completedDay === getDayKey()
       ? "Done today"
       : "Done";
   }
 
   return "Completed";
+}
+
+
+function renderGoalRepeat(
+  host,
+  goal
+) {
+  const badge =
+    host.querySelector(
+      ".goal-repeat-badge"
+    );
+
+  if (!badge) {
+    return;
+  }
+
+  badge.hidden =
+    !isRepeatingGoal(goal);
 }
 
 function renderGoalState(
@@ -1434,6 +1739,11 @@ function renderGoals() {
         parentEl.hidden =
           false;
       }
+
+      renderGoalRepeat(
+        card,
+        goal
+      );
 
       const checkbox =
         card.querySelector(
@@ -1897,6 +2207,19 @@ function renderGoalTreeNode(
 
   renderGoalState(item, goal);
 
+  const repeat =
+    document.createElement("p");
+
+  repeat.className =
+    "goal-repeat-badge";
+
+  repeat.textContent =
+    "↻ Daily";
+
+  item.append(repeat);
+
+  renderGoalRepeat(item, goal);
+
   const actions =
     document.createElement("div");
 
@@ -1994,6 +2317,11 @@ function createGoal(data) {
     type:
       data.type,
 
+    // Recurrence is its own field, never a type. Only Step and Quest
+    // may set it; an Arc is always false.
+    repeatsDaily:
+      data.repeatsDaily,
+
     skillId:
       data.skillId,
 
@@ -2020,9 +2348,23 @@ function createGoal(data) {
     newGoal
   );
 
+  syncGoalParents();
+
   saveState();
 
   render();
+}
+
+
+// Every goal write re-runs the same parent pass. Editing an Arc into a
+// Step can strand a child under it, and deleting a goal can strand a
+// whole subtree; both are fixed by clearing the link here, which never
+// touches the goal itself.
+function syncGoalParents() {
+  state.goals =
+    normalizeGoalParents(
+      state.goals
+    );
 }
 
 
@@ -2187,6 +2529,8 @@ function updateGoal(
     patch
   );
 
+  syncGoalParents();
+
   saveState();
 
   render();
@@ -2219,6 +2563,8 @@ function deleteGoal(id) {
       (item) =>
         item.id !== id
     );
+
+  syncGoalParents();
 
   saveState();
 
@@ -2266,8 +2612,12 @@ function populateSkillSelect(
 }
 
 
+// Only the goals that may sit above this one are offered: a Quest
+// lists the Arcs, a Step lists both. "None" is always there, so a goal
+// never has to be planned into a hierarchy before it can be created.
 function populateParentSelect(
   skillId = "",
+  type = "step",
   currentGoalId = null,
   selectedId = ""
 ) {
@@ -2278,7 +2628,7 @@ function populateParentSelect(
 
   placeholder.value = "";
   placeholder.textContent =
-    "No parent goal";
+    "None";
 
   els.goalParent.append(
     placeholder
@@ -2287,12 +2637,13 @@ function populateParentSelect(
   els.goalParent.disabled =
     !skillId;
 
+  const allowed = goalParentTypes[type] || [];
+
   if (skillId) {
     state.goals.forEach((goal) => {
       if (
-        goal.id ===
-          currentGoalId ||
-        goal.type !== "long" ||
+        goal.id === currentGoalId ||
+        !allowed.includes(goal.type) ||
         goal.skillId !== skillId
       ) {
         return;
@@ -2304,8 +2655,10 @@ function populateParentSelect(
       option.value =
         goal.id;
 
+      // Step can pick between two roles, so the option names the role
+      // it would be nested under.
       option.textContent =
-        goal.title;
+        `${getGoalTypeMeta(goal.type).label} · ${goal.title}`;
 
       els.goalParent.append(
         option
@@ -2324,7 +2677,7 @@ function populateXpOptions(
 ) {
   const options =
     goalXpOptions[type] ||
-    goalXpOptions.daily;
+    goalXpOptions.step;
 
   let values = options;
 
@@ -2367,6 +2720,53 @@ function populateXpOptions(
 }
 
 
+// Keeps the form in step with the selected role: the title
+// placeholder explains the type, the compact hint names it, and the two
+// fields that do not apply to an Arc are taken away. The title input is
+// only ever given a placeholder, never a value, so switching type mid
+// sentence cannot throw away what the user typed.
+function syncGoalTypeUI() {
+  const meta = getGoalTypeMeta(
+    els.goalType.value
+  );
+
+  els.goalTitle.placeholder =
+    meta.placeholder;
+
+  els.goalTypeHint.textContent =
+    meta.hint;
+
+  els.goalTypeHint.dataset.type =
+    meta.label.toLowerCase();
+
+  const repeatable =
+    canGoalRepeatDaily(
+      els.goalType.value
+    );
+
+  els.goalRepeatField.hidden =
+    !repeatable;
+
+  els.goalRepeat.disabled =
+    !repeatable;
+
+  if (!repeatable) {
+    els.goalRepeat.checked = false;
+  }
+
+  const canNest =
+    (goalParentTypes[els.goalType.value] || [])
+      .length > 0;
+
+  els.goalParentField.hidden =
+    !canNest;
+
+  if (!canNest) {
+    els.goalParent.value = "";
+  }
+}
+
+
 function openGoalModal(
   goal = null,
   presetType = null,
@@ -2377,7 +2777,7 @@ function openGoalModal(
   const type =
     goal
       ? goal.type
-      : presetType || "daily";
+      : presetType || "step";
 
   const defaultSkill =
     goal
@@ -2396,8 +2796,11 @@ function openGoalModal(
   const skillId =
     els.goalSkill.value;
 
+  els.goalType.value = type;
+
   populateParentSelect(
     skillId,
+    type,
     goal
       ? goal.id
       : null,
@@ -2413,8 +2816,10 @@ function openGoalModal(
       : null
   );
 
-  els.goalType.value =
-    type;
+  // Editing keeps whatever the goal already had, so opening the form
+  // never changes a goal on its own.
+  els.goalRepeat.checked =
+    isRepeatingGoal(goal);
 
   if (goal) {
     els.goalModalTitle.textContent =
@@ -2435,6 +2840,8 @@ function openGoalModal(
     els.goalId.value =
       "";
   }
+
+  syncGoalTypeUI();
 
   els.goalModal.showModal();
 }
@@ -2664,20 +3071,37 @@ document
 // GOAL FORM
 // ===============================
 
+// Selecting a different role re-reads the form: the placeholder and hint
+// follow the type, the parent list is rebuilt for the type, and the
+// rewards follow the type. The current parent is kept when it is still
+// legal, and dropped when it is not.
+function handleGoalTypeChange() {
+  syncGoalTypeUI();
+
+  populateXpOptions(
+    els.goalType.value
+  );
+
+  populateParentSelect(
+    els.goalSkill.value,
+    els.goalType.value,
+    els.goalId.value || null,
+    els.goalParent.value
+  );
+}
+
 els.goalType.addEventListener(
   "change",
-  () => {
-    populateXpOptions(
-      els.goalType.value
-    );
-  }
+  handleGoalTypeChange
 );
 
 els.goalSkill.addEventListener(
   "change",
   () => {
     populateParentSelect(
-      els.goalSkill.value
+      els.goalSkill.value,
+      els.goalType.value,
+      els.goalId.value || null
     );
   }
 );
@@ -2687,18 +3111,28 @@ els.goalForm.addEventListener(
   (event) => {
     event.preventDefault();
 
+    // buildGoalPatch settles everything that depends on the type, so an
+    // Arc can never be saved as repeating and a Step can never be saved
+    // under a Step.
     const payload = {
+      ...buildGoalPatch(
+        {
+          id: els.goalId.value,
+          type: els.goalType.value,
+          repeatsDaily:
+            els.goalRepeat.checked,
+          skillId: els.goalSkill.value,
+          parentGoalId:
+            els.goalParent.value,
+        },
+        state.goals
+      ),
+
       title:
         els.goalTitle.value,
 
-      type:
-        els.goalType.value,
-
       skillId:
         els.goalSkill.value,
-
-      parentGoalId:
-        els.goalParent.value,
 
       description:
         els.goalDescription.value,
@@ -3019,7 +3453,9 @@ async function pullFromCloud() {
     return;
   }
 
-  state = remoteState;
+  // A cloud document can be older than this build, so it goes through
+  // the same migration as the local one before it is used.
+  state = migrateState(remoteState);
 
   saveState();
   render();

@@ -56,7 +56,14 @@ creates the Firebase user, later ones just sign it in.
 - Browser persistence through `localStorage`.
 - Search across goals and skills.
 - Automatic goal counts.
-- Clicking a skill opens its detail page with a goal tree (parent long goals nest their children).
+- Clicking a skill opens its detail page with a goal tree (arcs nest the steps and quests that belong to them).
+- Goals come in three sizes, not four: a **step** is a concrete action, a **quest** is a meaningful
+  outcome, and an **arc** is a larger direction that can contain several quests. A step may sit
+  under a quest or an arc, a quest may sit under an arc, and every parent is optional.
+- Recurrence is a separate switch from size: a step or a quest can be marked `Repeat daily` and
+  then shows a `↻ Daily` badge. Completing one keeps the streak alive. The old four types
+  (`daily` / `short` / `medium` / `long`) are migrated on load: `daily` becomes a repeating step,
+  `short` a step, `medium` a quest and `long` an arc, keeping titles, XP, completion and streaks.
 - Exponential level/XP curve (reaching level N requires (N-1)^2 * 100 XP).
 - Completion feedback: the checkbox pops, the card switches to a dimmed "done" state with a
   `Done today` chip, a `+XP` hint floats up from the card, and the skill and player bars animate
@@ -64,7 +71,7 @@ creates the Firebase user, later ones just sign it in.
   (`READING LEVEL UP — Lv. 4 → Lv. 5`); two level-ups play one after the other. The one goal
   reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
   in `styles.css` and are reduced under `prefers-reduced-motion`.
-- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00. The badge markup ships in the page HTML and `app.js` only swaps the tier class and the day count, so the badge still renders when a stale cached script fails to run.
+- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00. Only goals marked *Repeat daily* count toward it, so a one-off quest does not keep a streak alive. The badge markup ships in the page HTML and `app.js` only swaps the tier class and the day count, so the badge still renders when a stale cached script fails to run.
 - Goal maintenance actions live behind one `···` trigger per goal card instead of permanent
   Edit/Delete buttons, which keeps the card quiet next to completion, title and XP. The menu is a
   single `position: fixed` element on `<body>` (`role="menu"`, `aria-haspopup` /

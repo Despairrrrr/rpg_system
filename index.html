@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
   <header class="topbar">
@@ -37,40 +37,31 @@
       </div>
 
       <div class="goal-board" id="goalBoard">
-        <article class="goal-column daily" data-type="daily">
+        <article class="goal-column step" data-type="step">
           <div class="column-header">
-            <h2>DAILY</h2>
-            <span class="goal-count" data-count="daily">0 goals</span>
+            <h2>STEPS</h2>
+            <span class="goal-count" data-count="step">0 goals</span>
           </div>
-          <div class="goal-list" data-list="daily"></div>
-          <button class="column-add-btn" data-add-goal="daily">+ Add goal</button>
+          <div class="goal-list" data-list="step"></div>
+          <button class="column-add-btn" data-add-goal="step">+ Add goal</button>
         </article>
 
-        <article class="goal-column short" data-type="short">
+        <article class="goal-column quest" data-type="quest">
           <div class="column-header">
-            <h2>SHORT</h2>
-            <span class="goal-count" data-count="short">0 goals</span>
+            <h2>QUESTS</h2>
+            <span class="goal-count" data-count="quest">0 goals</span>
           </div>
-          <div class="goal-list" data-list="short"></div>
-          <button class="column-add-btn" data-add-goal="short">+ Add goal</button>
+          <div class="goal-list" data-list="quest"></div>
+          <button class="column-add-btn" data-add-goal="quest">+ Add goal</button>
         </article>
 
-        <article class="goal-column medium" data-type="medium">
+        <article class="goal-column arc" data-type="arc">
           <div class="column-header">
-            <h2>MEDIUM</h2>
-            <span class="goal-count" data-count="medium">0 goals</span>
+            <h2>ARCS</h2>
+            <span class="goal-count" data-count="arc">0 goals</span>
           </div>
-          <div class="goal-list" data-list="medium"></div>
-          <button class="column-add-btn" data-add-goal="medium">+ Add goal</button>
-        </article>
-
-        <article class="goal-column long" data-type="long">
-          <div class="column-header">
-            <h2>LONG</h2>
-            <span class="goal-count" data-count="long">0 goals</span>
-          </div>
-          <div class="goal-list" data-list="long"></div>
-          <button class="column-add-btn" data-add-goal="long">+ Add goal</button>
+          <div class="goal-list" data-list="arc"></div>
+          <button class="column-add-btn" data-add-goal="arc">+ Add goal</button>
         </article>
       </div>
     </section>
@@ -138,17 +129,22 @@
 
       <label>
         Title
-        <input id="goalTitle" required maxlength="80" placeholder="e.g. Read 20 pages" />
+        <input id="goalTitle" required maxlength="80" placeholder="A concrete action you can start now" />
       </label>
 
       <label>
         Type
         <select id="goalType" required>
-          <option value="daily">Daily</option>
-          <option value="short">Short</option>
-          <option value="medium">Medium</option>
-          <option value="long">Long</option>
+          <option value="step">Step</option>
+          <option value="quest">Quest</option>
+          <option value="arc">Arc</option>
         </select>
+        <p class="type-hint" id="goalTypeHint" data-type="step">Concrete action</p>
+      </label>
+
+      <label class="goal-repeat" id="goalRepeatField">
+        <input type="checkbox" id="goalRepeat" />
+        <span>Repeat daily</span>
       </label>
 
       <label>
@@ -158,10 +154,10 @@
         </select>
       </label>
 
-      <label>
-        Parent goal
+      <label id="goalParentField">
+        Part of
         <select id="goalParent">
-          <option value="">No parent goal</option>
+          <option value="">None</option>
         </select>
       </label>
 
@@ -241,6 +237,7 @@
       <p class="goal-state" hidden></p>
       <p class="goal-skill" hidden>Skill: <span class="goal-skill-name"></span></p>
       <p class="goal-parent" hidden>Part of: <span class="goal-parent-title"></span></p>
+      <p class="goal-repeat-badge" hidden>↻ Daily</p>
       <div class="goal-card-actions">
         <button
           class="goal-menu-trigger"
@@ -282,6 +279,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase.init.js?v=2"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
