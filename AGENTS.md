@@ -23,6 +23,11 @@ them; update the documentation alongside that change.
 - Statistics contains exactly Weekly Activity, Top Skill Progression and Life Areas,
   sharing one Monday–Sunday week selection with future weeks disabled. Do not add
   other analytics modules as part of an unrelated feature.
+- The compact weekly summary shows only Goals completed and XP earned, never Active
+  Skills. Top Skill Progression has no Skill icons. Life Area count and names come
+  from user data; the six-Area reference image is an example, not a fixed preset.
+- Preserve chart-only entry/week-change animations, reduced-motion support and the
+  distinction between untracked history and tracked weeks with zero activity.
 
 ## Preserve data behavior
 

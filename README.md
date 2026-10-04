@@ -71,6 +71,14 @@ creates the Firebase user, later ones just sign it in.
 - Search across goals and skills.
 - Automatic goal counts.
 - Statistics: daily completion counts, the top five Skills by weekly XP, and Life Area shares of categorized weekly XP. All use the same Monday–Sunday week; future weeks are disabled.
+- Statistics uses a compact title/week/summary header, two upper chart panels, and a
+  full-width Life Areas radar/breakdown. The summary contains **Goals completed** and
+  **XP earned** only; there is no Active Skills metric and no Skill icon in the ranking.
+- Charts animate on entry and transition directly between weeks, including rapid clicks.
+  Names and values remain visible; reduced motion shows final values immediately.
+- Life Area axes show user-defined names and percentages with full names in the breakdown.
+  The count is dynamic: 3–8 Areas use a radar and larger sets use the complete list.
+  Pre-tracking history is distinguished from tracked weeks with zero activity.
 - User-created Life Areas require at least one existing Skill on creation. Skills can be moved or uncategorized afterwards.
 - Completion history starts when schema v3 is first loaded; old Goals and XP are preserved without inventing past activity. Manual undo reverses the original recorded reward; the daily reset preserves it.
 - Clicking a skill opens its detail page with a goal tree (arcs nest the steps and quests that belong to them).

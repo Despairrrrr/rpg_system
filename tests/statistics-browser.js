@@ -75,7 +75,7 @@
     render();
     assert($('weeklyGoalCount').textContent === '4 goals', 'weekly count shows goals, not XP');
     assert($('skillProgression').firstElementChild.textContent.includes('Uncategorized'), 'uncategorized Skill leads weekly ranking');
-    assert($('areaRadar').querySelector('svg') && $('areaBreakdown').textContent.includes('50.0%'), 'radar with 50/30/20 shares');
+    assert($('areaRadar').querySelector('svg') && $('areaBreakdown').textContent.includes('50%'), 'radar with 50/30/20 shares');
     $('manageLifeAreas').click();
     const assignment = $('skillAreaAssignments').querySelector('select');
     const learningId = firstSkill.lifeAreaId;

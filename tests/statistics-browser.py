@@ -19,7 +19,8 @@ html = re.sub(r'<script src="https:[^"]+"></script>', '', html)
 html = re.sub(r'<link[^>]+https:[^>]+>', '', html)
 html = re.sub(r'<script src="firebase.init.js[^"]*"></script>', '', html)
 html = html.replace('<script src="statistics-model.js', '<script>localStorage.setItem("neonGoalTracker.v1", ' + json.dumps(json.dumps(seed)) + ');</script><script src="statistics-model.js')
-html = html.replace('</body>', '<script src="tests/statistics-browser.js"></script></body>')
+test_script = os.environ.get('STATISTICS_TEST_SCRIPT', 'statistics-browser.js')
+html = html.replace('</body>', f'<script src="tests/{test_script}"></script></body>')
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -51,6 +52,8 @@ if sys.argv[1] == 'webkit':
     gi.require_version('Gtk', '3.0')
     gi.require_version('WebKit2', '4.1')
     from gi.repository import Gtk, WebKit2, GLib
+    if os.environ.get('STATISTICS_REDUCED_MOTION') == '1':
+        Gtk.Settings.get_default().set_property('gtk-enable-animations', False)
     context = WebKit2.WebContext.new_ephemeral()
     view = WebKit2.WebView.new_with_context(context)
     window = Gtk.OffscreenWindow()
@@ -62,6 +65,9 @@ if sys.argv[1] == 'webkit':
     def result_ready(webview, result, *_):
         try:
             value = webview.evaluate_javascript_finish(result).to_string()
+            if not value:
+                GLib.timeout_add(200, check_result)
+                return
             outcome.append(value)
             print(value)
             surface = window.get_surface()
@@ -71,10 +77,14 @@ if sys.argv[1] == 'webkit':
             print(error)
         Gtk.main_quit()
 
+    def check_result():
+        script = "document.getElementById('test-result')?.textContent || ''"
+        view.evaluate_javascript(script, -1, None, None, None, result_ready, None)
+        return False
+
     def loaded(webview, event):
         if event == WebKit2.LoadEvent.FINISHED:
-            script = "document.getElementById('test-result')?.textContent || 'FAIL: test did not finish'"
-            GLib.timeout_add(500, lambda: webview.evaluate_javascript(script, -1, None, None, None, result_ready, None))
+            GLib.timeout_add(700, check_result)
 
     view.connect('load-changed', loaded)
     view.load_uri(f'http://127.0.0.1:{server.server_port}/statistics-test')
@@ -88,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix='statistics-browser-') as profile:
         sys.argv[1], '--headless', '--no-sandbox', '--disable-gpu', '--disable-background-networking',
         '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--no-proxy-server', '--disable-dev-shm-usage',
         '--user-data-dir=' + profile, '--window-size=' + width + ',' + height,
-        '--virtual-time-budget=3000', '--dump-dom', '--screenshot=/tmp/statistics-' + width + '.png',
+        '--virtual-time-budget=15000', '--dump-dom', '--screenshot=/tmp/statistics-' + width + '.png',
         f'http://127.0.0.1:{server.server_port}/statistics-test',
     ], capture_output=True, text=True, timeout=45)
     match = re.search(r'<pre id="test-result"[^>]*>(.*?)</pre>', result.stdout, re.S)

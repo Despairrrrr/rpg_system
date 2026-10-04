@@ -1694,3 +1694,94 @@ button:disabled { cursor: default; opacity: .4; }
   .area-edit-row input { flex-basis: 100%; }
   .life-areas-manager .skill-area-assignment { grid-template-columns: 1fr; gap: 6px; }
 }
+
+/* Statistics: compact overview, using the application's existing neon tokens. */
+.statistics-page {
+  --motion-stats-bar: 520ms;
+  --motion-stats-radar: 580ms;
+  max-width: 1320px;
+  padding-top: 26px;
+}
+.statistics-heading { display: grid; grid-template-columns: 1.12fr 1fr; gap: 16px; margin-bottom: 16px; }
+.statistics-title-week { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-width: 0; }
+.statistics-heading h1 { font-size: 28px; margin: 0; }
+.week-picker { padding: 5px; gap: 8px; flex-shrink: 0; border-radius: 9px; }
+.week-picker strong { min-width: 185px; font-size: 12px; }
+.week-picker button { padding: 7px 12px; }
+.week-summary { display: flex; align-items: center; min-height: 56px; margin: 0; padding: 10px 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--muted); font-size: 12px; }
+.summary-metric { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 0 16px; font-variant-numeric: tabular-nums; }
+.summary-metric:first-child { padding-left: 0; }
+.summary-metric + .summary-metric { border-left: 1px solid var(--line); }
+.summary-metric strong { color: var(--text); font-size: 18px; }
+.summary-metric:last-child strong { color: var(--green); }
+.statistics-grid { grid-template-columns: 1.12fr 1fr; gap: 16px; }
+.statistics-card { padding: 20px; border-radius: 12px; }
+.statistics-card h2 { font-size: 17px; }
+.statistics-card h2 + p { margin: 7px 0 0; font-size: 12px; }
+.statistics-total { font-size: 12px; }
+.statistics-notice { margin: 0 0 16px; }
+.activity-plot { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 18px; }
+.activity-scale { display: flex; flex-direction: column; justify-content: space-between; height: 180px; margin-top: 26px; text-align: right; font-size: 11px; color: var(--muted); }
+.activity-scale span { line-height: 0; }
+.activity-chart { position: relative; margin: 0; gap: 14px; }
+.activity-chart::before { content: ''; position: absolute; top: 26px; right: 0; left: 0; height: 180px; border-block: 1px solid rgba(71,181,255,.16); background: linear-gradient(to top, rgba(71,181,255,.12) 1px, transparent 1px); background-size: 100% 25%; pointer-events: none; }
+.activity-day { position: relative; gap: 8px; min-width: 0; }
+.activity-value { height: 18px; line-height: 18px; position: absolute; bottom: calc(32px + var(--count-height, 0px)); font-size: 11px; z-index: 2; }
+.activity-track { max-width: 38px; height: 180px; margin-top: 26px; border: 0; z-index: 1; }
+.activity-label { height: 18px; line-height: 18px; font-size: 11px; }
+.activity-bar { background: linear-gradient(0deg, rgba(32,185,255,.4), var(--blue)); box-shadow: 0 0 10px rgba(32,185,255,.14); border-top: 1px solid rgba(255,255,255,.35); }
+.activity-bar[style*="height: 0%"] { border-top: 0; }
+.activity-bar.is-animating { transition: height var(--motion-stats-bar) var(--ease-out); }
+.progression-bar.is-animating { transition: width var(--motion-stats-bar) var(--ease-out); }
+.skill-progression { margin-top: 24px; }
+.skill-progression-row { margin-bottom: 21px; }
+.skill-progression-row:last-child { margin-bottom: 0; }
+.skill-progression .progression-track { margin-top: 8px; height: 6px; }
+.skill-progression .progression-bar { background: linear-gradient(90deg, var(--goal-step), var(--green)); box-shadow: 0 0 8px rgba(29,244,161,.15); }
+.progression-label { font-size: 13px; }
+.area-visualization { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+#areaRadar { width: min(100%, 460px); justify-self: center; }
+.radar-grid { stroke: rgba(71,181,255,.3); }
+.radar-value { fill: rgba(32,185,255,.24); filter: drop-shadow(0 0 3px rgba(32,185,255,.25)); }
+.radar-dot { stroke: var(--text); stroke-width: .8px; }
+.radar-label { font-size: 12px; }
+.radar-percentage { fill: var(--text); font-size: 11px; }
+.area-breakdown { width: 100%; max-width: none; margin: 20px 0; }
+.area-breakdown:only-child, .area-visualization:not(:has(#areaRadar svg)) .area-breakdown { grid-column: 1 / -1; }
+.area-breakdown .area-breakdown-row { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(70px, 1.2fr) 52px 76px; align-items: center; gap: 12px; margin: 0; padding: 11px 0; }
+.area-name { display: flex; gap: 9px; align-items: center; font-size: 12px; overflow-wrap: anywhere; }
+.area-color { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: var(--area-accent); box-shadow: 0 0 7px color-mix(in srgb, var(--area-accent) 30%, transparent); }
+.area-breakdown .progression-track { margin: 0; height: 7px; }
+.area-breakdown .progression-bar { background: var(--area-accent); }
+.area-share { color: var(--area-accent); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.area-xp { font-size: 11px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.life-areas-card > .statistics-muted { font-size: 11px; margin: 10px 0 0; }
+.statistics-empty { border: 1px dashed rgba(71,181,255,.2); border-radius: 8px; padding: 24px; margin-top: 20px; }
+@media (max-width: 1100px) {
+  .statistics-heading { grid-template-columns: 1fr; }
+  .week-summary { max-width: none; }
+  .area-breakdown .area-breakdown-row { grid-template-columns: minmax(70px, 1fr) minmax(45px, 1fr) 44px 60px; gap: 8px; }
+}
+@media (max-width: 850px) {
+  .statistics-grid { grid-template-columns: 1fr; }
+  .statistics-title-week { width: 100%; }
+  .area-visualization { grid-template-columns: 1fr; gap: 0; }
+  #areaRadar { max-width: 420px; }
+  .area-breakdown .area-breakdown-row { grid-template-columns: minmax(80px, 1fr) minmax(70px, 1.2fr) 48px 68px; }
+}
+@media (max-width: 480px) {
+  .statistics-page { padding: 20px 12px; }
+  .statistics-title-week { flex-wrap: wrap; gap: 14px; }
+  .statistics-heading h1 { font-size: 26px; }
+  .week-picker { width: 100%; }
+  .week-summary { padding: 12px 16px; }
+  .statistics-card { padding: 16px; }
+  .activity-chart { gap: 8px; }
+  .area-breakdown .area-breakdown-row { grid-template-columns: minmax(0,1fr) 48px 68px; gap: 8px; padding: 10px 0; }
+  .area-breakdown .progression-track { grid-column: 1 / -1; grid-row: 2; }
+  .area-share { grid-column: 2; grid-row: 1; }
+  .area-xp { grid-column: 3; grid-row: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #statisticsPage .is-animating { transition: none !important; }
+}

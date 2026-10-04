@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <header class="topbar">
@@ -117,18 +117,25 @@
 
   <main id="statisticsPage" class="statistics-page" hidden>
     <div class="statistics-heading">
-      <div><h1>Statistics</h1></div>
-      <div class="week-picker" aria-label="Select calendar week">
-        <button id="previousWeek" class="secondary-btn" aria-label="Previous week">←</button>
-        <strong id="selectedWeek" aria-live="polite"></strong>
-        <button id="nextWeek" class="secondary-btn" aria-label="Next week">→</button>
+      <div class="statistics-title-week">
+        <h1>Statistics</h1>
+        <div class="week-picker" aria-label="Select calendar week">
+          <button id="previousWeek" class="secondary-btn" aria-label="Previous week">←</button>
+          <strong id="selectedWeek" aria-live="polite"></strong>
+          <button id="nextWeek" class="secondary-btn" aria-label="Next week">→</button>
+        </div>
       </div>
+      <div class="week-summary" id="weekSummary" aria-live="polite" aria-atomic="true">
+        <div class="summary-metric"><strong id="summaryGoals">0</strong><span>Goals completed</span></div>
+        <div class="summary-metric"><strong id="summaryXp">0</strong><span>XP earned</span></div>
+      </div>
+      <p id="summaryUnavailable" class="week-summary" hidden>Summary unavailable before tracking started.</p>
     </div>
     <p id="statisticsCoverage" class="statistics-notice" role="status"></p>
     <div class="statistics-grid">
       <section class="panel statistics-card activity-card" aria-labelledby="activityTitle">
         <div class="statistics-card-head"><div><h2 id="activityTitle">Weekly Activity</h2><p class="statistics-muted">Goals completed each day</p></div><span id="weeklyGoalCount" class="statistics-total"></span></div>
-        <div id="activityChart" class="activity-chart" aria-label="Daily completed goals"></div>
+        <div class="activity-plot"><div id="activityScale" class="activity-scale" aria-hidden="true"></div><div id="activityChart" class="activity-chart" aria-label="Daily completed goals"></div></div>
         <p id="activityEmpty" class="statistics-muted"></p>
       </section>
       <section class="panel statistics-card" aria-labelledby="progressionTitle">
@@ -138,7 +145,7 @@
         <p id="progressionEmpty" class="statistics-empty"></p>
       </section>
       <section class="panel statistics-card life-areas-card" aria-labelledby="areasTitle">
-        <div class="statistics-card-head"><div><h2 id="areasTitle">Life Areas</h2><p class="statistics-muted">Share of your weekly focus</p></div><button id="manageLifeAreas" class="secondary-btn">Manage Life Areas</button></div>
+        <div class="statistics-card-head"><div><h2 id="areasTitle">Life Areas</h2><p class="statistics-muted">Share of your weekly focus based on XP earned</p></div><button id="manageLifeAreas" class="secondary-btn">Manage Life Areas</button></div>
         <div id="areaEmpty" class="statistics-empty"></div>
         <div class="area-visualization"><div id="areaRadar"></div><ul id="areaBreakdown" class="area-breakdown"></ul></div>
         <p class="statistics-muted">Percentages include only categorized Skills. Moving a Skill changes its Life Area for all weeks.</p>
@@ -323,7 +330,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase.init.js?v=2"></script>
   <script src="statistics-model.js?v=1"></script>
-  <script src="statistics.js?v=2"></script>
+  <script src="statistics.js?v=5"></script>
   <script src="app.js?v=10"></script>
 </body>
 </html>

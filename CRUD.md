@@ -15,6 +15,8 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Skill rows | Keep their own edit/delete buttons and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
 | Skill creation | **+ Add skill** in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
 | Statistics → Life Areas | Create/rename/delete Areas and assign existing Skills; no **+ Create a Skill** button | `#lifeAreasModal`, `createStatisticsView()` |
+| Statistics overview | Week selector plus Goals completed and XP earned only; no Active Skills metric | `#weekSummary`, `#summaryGoals`, `#summaryXp` |
+| Statistics charts | No Skill icons; dynamic user-created Life Areas, not a fixed set of six | `statistics.js`, `statistics-model.js` |
 
 The shared Goal menu uses `GOAL_MENU_ITEMS`, calls `openGoalModal()` and `deleteGoal()`,
 and retains delete confirmation, keyboard navigation, Escape and outside-click dismissal.
@@ -627,3 +629,41 @@ The JavaScript tests also support Node. The browser runner accepts a Chromium ex
 instead of `webkit`. It uses isolated browser storage, fixture data and a localhost server;
 it omits Firebase scripts so tests cannot change real cloud data. Screenshots are saved to
 `/tmp/statistics-<width>.png`.
+
+## Statistics presentation and motion
+
+The compact overview aligns the title/week selector with a two-metric summary: completed
+Goals and total weekly earned XP. XP includes uncategorized Skills and Skills beyond the
+five displayed ranking rows. There is deliberately no Active Skills metric or Skill icon.
+The reference image guides spacing and layout, not category count, names or palette.
+Charts use existing neon theme tokens. The activity axis uses integer ticks; its scale is
+presentation only and does not change completion counts.
+
+Life Areas show a radar beside rows containing a color marker, full name, share bar,
+percentage and weekly XP. Colors follow Area identity consistently across week changes.
+Axes show names and percentages; long names are shortened using measured SVG text widths,
+with full names retained in titles and the breakdown. The radar uses 3–8 user-created Areas;
+more Areas use the complete breakdown. No categories or demonstration data are seeded.
+
+`createStatisticsView()` owns its selected week and presentation state in a local closure.
+On entry, bars grow with 520 ms CSS transitions and a small stagger; the SVG data polygon
+expands over 580 ms using `requestAnimationFrame`. On week/data changes, displayed bar
+sizes and polygon points are sampled before rebuilding, so interrupted transitions continue
+from the visible geometry. Skill bars match by ID when ranking changes. Names, XP, grid,
+labels and the page stay still. Unchanged data does not restart animations.
+
+Hidden views and reduced motion render final values immediately. A live reduced-motion
+change cancels the radar frame and settles charts. Empty states also cancel old frames.
+The summary and graph show unavailable history separately from genuine zero activity.
+Partial tracking weeks explain their coverage; no categorized XP produces no zero radar;
+fewer than three Areas shows setup guidance and the existing Manage Life Areas action.
+
+Additional browser scenarios (same isolated runner, no Firebase):
+
+```sh
+STATISTICS_TEST_SCRIPT=statistics-polish-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=statistics-polish-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
+```
+
+These check entry and interrupted week transitions, summaries, zero/untracked states,
+uncategorized rewards, 3/4/6/8/9 Areas, long names, overflow, and unchanged application data.
