@@ -1612,3 +1612,85 @@ button { cursor: pointer; }
     padding: 24px 20px;
   }
 }
+
+/* Statistics uses the same calendar week across all three modules. */
+[hidden] { display: none !important; }
+.statistics-page { max-width: 1400px; margin: 0 auto; padding: 36px 32px 64px; }
+.statistics-heading, .statistics-card-head, .week-picker, .progression-label {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+}
+.statistics-heading h1 { margin: 0 0 8px; font-size: 32px; }
+.statistics-muted { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.week-picker { padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.week-picker strong { min-width: 195px; text-align: center; font-size: 14px; }
+button:disabled { cursor: default; opacity: .4; }
+.statistics-notice { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 24px 0; }
+.statistics-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; }
+.statistics-card { padding: 26px; min-width: 0; }
+.statistics-card h2 { font-size: 18px; margin: 0; }
+.statistics-card h2 + p { margin-top: 8px; }
+.statistics-card-head { align-items: flex-start; }
+.statistics-total { white-space: nowrap; font-size: 14px; color: var(--blue); }
+.activity-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+.activity-day { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.activity-track { width: 100%; max-width: 42px; height: 155px; display: flex; align-items: flex-end; border-bottom: 1px solid var(--line); }
+.activity-bar { width: 100%; background: linear-gradient(0deg, #1272a7, var(--blue)); border-radius: 6px 6px 0 0; }
+.activity-label, .activity-value { font-size: 12px; color: var(--muted); }
+.activity-value { color: var(--text); }
+.skill-progression, .area-breakdown { list-style: none; margin: 26px 0 0; padding: 0; }
+.skill-progression-row { margin-bottom: 23px; }
+.progression-label { align-items: baseline; font-size: 14px; }
+.progression-label strong { white-space: nowrap; color: var(--green); font-size: 13px; }
+.progression-label a, .area-name { overflow-wrap: anywhere; min-width: 0; }
+.progression-track { height: 5px; border-radius: 4px; background: rgba(71, 181, 255, .12); margin-top: 10px; overflow: hidden; }
+.progression-bar { height: 100%; background: var(--green); border-radius: inherit; }
+.life-areas-card { grid-column: 1 / -1; }
+.statistics-empty { padding: 22px 0; color: var(--muted); line-height: 1.7; font-size: 14px; }
+.area-visualization { display: flex; align-items: center; justify-content: center; gap: 48px; }
+#areaRadar:empty, .area-breakdown:empty { display: none; }
+#areaRadar { width: min(100%, 360px); flex-shrink: 0; }
+#areaRadar svg { display: block; width: 100%; }
+.radar-grid { fill: none; stroke: rgba(71, 181, 255, .25); stroke-width: 1; }
+.radar-value { fill: rgba(32, 185, 255, .22); stroke: var(--blue); stroke-width: 2; }
+.radar-dot { fill: var(--blue); }
+.radar-label { fill: var(--muted); font-size: 12px; }
+.area-breakdown { flex: 1; max-width: 600px; margin: 18px 0; }
+.area-breakdown li { margin: 0 0 18px; }
+.area-breakdown .progression-bar { background: var(--blue); }
+.area-breakdown .progression-label strong { color: var(--blue); }
+.life-areas-manager { width: min(680px, 90vw); }
+.life-areas-manager h3 { font-size: 15px; margin: 8px 0 14px; }
+.life-areas-manager form, .life-areas-manager section { min-width: 0; }
+.life-areas-manager section { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 24px; }
+.life-areas-manager fieldset { margin: 16px 0 0; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+.life-areas-manager legend { font-size: 13px; color: var(--muted); padding: 0 6px; }
+.area-skill-options { display: grid; gap: 12px; max-height: 220px; overflow-y: auto; }
+.area-skill-option { display: flex !important; align-items: center; gap: 10px; }
+.area-skill-option input { width: auto; accent-color: var(--blue); }
+.area-skill-option span { overflow-wrap: anywhere; }
+.life-areas-manager .skill-area-assignment { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 16px; margin-bottom: 12px; }
+.skill-area-assignment span { overflow-wrap: anywhere; }
+.area-edit-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.area-edit-row input { flex: 1; min-width: 0; }
+.area-edit-row button { white-space: nowrap; }
+.form-error { color: #ff9f9f; font-size: 13px; }
+@media (max-width: 850px) {
+  .statistics-page { padding: 24px 16px; }
+  .statistics-heading { flex-direction: column; align-items: flex-start; }
+  .statistics-grid { grid-template-columns: 1fr; }
+  .area-visualization { flex-direction: column; gap: 8px; }
+  .area-breakdown { width: 100%; }
+}
+@media (max-width: 480px) {
+  .topbar { height: auto; min-height: 76px; flex-wrap: wrap; gap: 6px; }
+  .nav, .topbar-actions { gap: 6px; }
+  .nav-item { padding: 24px 10px 20px; font-size: 14px; }
+  .statistics-card { padding: 18px; }
+  .life-areas-card .statistics-card-head { flex-direction: column; }
+  .week-picker { gap: 6px; width: 100%; }
+  .week-picker strong { min-width: 0; flex: 1; }
+  .activity-chart { gap: 8px; }
+  .area-edit-row { flex-wrap: wrap; }
+  .area-edit-row input { flex-basis: 100%; }
+  .life-areas-manager .skill-area-assignment { grid-template-columns: 1fr; gap: 6px; }
+}

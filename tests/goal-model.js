@@ -23,7 +23,7 @@ assert(model.length > 0, 'goal model block not found');
 // Wrapped in a function so the block's own declarations live in the
 // eval's scope instead of colliding with the names destructured below.
 function loadModel() {
-  return eval(model + '\n({ goalTypes, goalTypeOrder, goalTypeMeta, goalXpOptions, goalParentTypes,' +
+  return eval(read('statistics-model.js') + '\n' + model + '\n({ goalTypes, goalTypeOrder, goalTypeMeta, goalXpOptions, goalParentTypes,' +
     ' legacyGoalTypes, SCHEMA_VERSION, getGoalTypeMeta, isRepeatingGoal, canGoalRepeatDaily,' +
     ' isCompatibleParentType, resolveParentId, normalizeGoalParents, buildGoalPatch,' +
     ' migrateGoalType, migrateGoals, migrateState });');

@@ -1,5 +1,31 @@
 # CRUD documentation
 
+## Current interface contract
+
+These decisions describe the implemented interface and must be preserved when adding
+unrelated features. Change them only when the user's new request calls for it, and update
+this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent guidance.
+
+| Surface | Accepted behavior | Implementation |
+|---|---|---|
+| Top navigation | **Goals** and **Statistics** only; no Skills tab | `index.html`, navigation handler in `app.js` |
+| Header actions | Search and sign-in; no inactive notification/settings buttons | `index.html` |
+| Dashboard Goals | One **…** menu containing Edit and Delete | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
+| Goals inside a Skill | The same **…** menu; no permanent Edit/Delete buttons | `renderGoalTreeNode()`, `createGoalActionsMenu()` |
+| Skill rows | Keep their own edit/delete buttons and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
+| Skill creation | **+ Add skill** in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
+| Statistics → Life Areas | Create/rename/delete Areas and assign existing Skills; no **+ Create a Skill** button | `#lifeAreasModal`, `createStatisticsView()` |
+
+The shared Goal menu uses `GOAL_MENU_ITEMS`, calls `openGoalModal()` and `deleteGoal()`,
+and retains delete confirmation, keyboard navigation, Escape and outside-click dismissal.
+The dashboard and Skill page render Goals separately, so changes to Goal actions must
+account for both render paths. The Life Areas dialog intentionally has no
+`createStatisticsSkill` element or `addSkill` callback.
+
+Old screenshots and commits may show the removed controls. They are not a specification
+for new work. The CRUD snippets below explain individual operations; inspect the actual
+functions before editing so validation, history, migration and shared UI behavior survive.
+
 ## 1. What CRUD means
 
 CRUD is the basic set of operations used to manage entities:
@@ -26,7 +52,11 @@ The application keeps one `state` object:
   },
   goals: [],
   skills: [],
-  schemaVersion: 2
+  lifeAreas: [],
+  completionHistory: [],
+  statisticsStartedOn: "2026-10-04",
+  updatedAt: 0,
+  schemaVersion: 3
 }
 ```
 
@@ -44,6 +74,7 @@ A goal looks like this:
   xp: 10,
   completed: false,
   completedDay: "",
+  activeCompletionId: "",
   createdAt: "2026-09-22T18:00:00.000Z"
 }
 ```
@@ -57,8 +88,8 @@ The three types describe how big a goal is, not how often it repeats. Recurrence
 | `quest` | A meaningful outcome you are working toward | yes | arc |
 | `arc` | A larger direction that can contain several quests | no | nothing |
 
-A goal is only ever one level deep: steps and quests hang off a goal, and that goal is
-always an arc. A parent is optional, and it must belong to the same skill.
+A Step can sit under a Quest under an Arc, or directly under an Arc. A parent is optional,
+and it must belong to the same Skill. Every Goal must reference an existing Skill.
 
 A skill looks like this:
 
@@ -66,7 +97,9 @@ A skill looks like this:
 {
   id: "uuid",
   name: "Reading",
-  xp: 25
+  goal: "Read regularly",
+  xp: 25,
+  lifeAreaId: "" // uncategorized
 }
 ```
 
@@ -104,13 +137,15 @@ wrong type). Goals are never dropped by a migration.
 Migration runs on every read, including a pull from the cloud, and is idempotent: running
 it on an already migrated document changes nothing. It deliberately does not save, because
 writing during a read would bump `updatedAt` and make a stale local document look newer
-than the cloud copy. The new shape is written out with the next real change.
+than the cloud copy. Startup persists the new shape with `saveState({ maintenance: true })`,
+which preserves the edit timestamp. The loader preserves `updatedAt`, `schemaVersion` and
+the additional Statistics fields. Cloud uploads wait for the sign-in comparison.
 
 ## Save state
 
 ```js
-function saveState() {
-  state.updatedAt = Date.now();
+function saveState({ maintenance = false } = {}) {
+  if (!maintenance) state.updatedAt = Date.now();
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   queueCloudSync();
@@ -136,6 +171,7 @@ The create function receives validated form data:
 
 ```js
 function createGoal(data) {
+  if (!state.skills.some(skill => skill.id === data.skillId)) return;
   state.goals.push({
     id: crypto.randomUUID(),
     title: data.title.trim(),
@@ -147,6 +183,7 @@ function createGoal(data) {
     xp: Number(data.xp) || 0,
     completed: false,
     completedDay: "",
+    activeCompletionId: "",
     createdAt: new Date().toISOString(),
   });
 
@@ -156,9 +193,9 @@ function createGoal(data) {
 }
 ```
 
-The form hands over already validated data: `buildGoalPatch()` trims the title, drops
-`repeatsDaily` for an arc, and blanks a parent that is not a legal parent for the chosen
-type, so the model never has to repair an illegal shape it was given.
+The form requires a title and Skill. `createGoal()` trims the title and checks that the
+Skill exists. `buildGoalPatch()` clears `repeatsDaily` for an Arc and blanks a parent that
+is not legal for the chosen type and Skill.
 
 ```js
 syncGoalParents(); // re-resolves parentGoalId after any change
@@ -199,14 +236,14 @@ visible.forEach((goal) => {
   // clone template
   // insert title, description, XP
   // show the "Daily" badge when goal.repeatsDaily
-  // attach edit/delete events
+  // attach the shared … menu with Edit/Delete actions
   // append card
 });
 ```
 
 The dashboard has one column per type (`STEPS`, `QUESTS`, `ARCS`) and the skill page nests
-the same goals under their arc. A repeating goal is marked with a `↻ Daily` badge in both
-places, which is the only visual difference between a repeating and a one off goal.
+the same goals under their Arc or Quest. Both views use `createGoalActionsMenu()` for
+Edit/Delete. A repeating goal is marked with a `↻ Daily` badge in both places.
 
 No explicit server `GET` request exists because this version has no backend.
 
@@ -220,6 +257,7 @@ Generic update:
 function updateGoal(id, patch) {
   const goal = state.goals.find((item) => item.id === id);
   if (!goal) return;
+  if (patch.skillId !== undefined && !state.skills.some(skill => skill.id === patch.skillId)) return;
 
   Object.assign(goal, patch);
   syncGoalParents();
@@ -245,15 +283,17 @@ updateGoal(id, {
 edited into a step, the goals that pointed at it simply lose that link and become top level
 goals; they are never deleted.
 
-Completing a goal uses exactly the same CRUD operation:
+Completing or manually unchecking a goal uses `toggleGoalCompletion()`, which also
+adds or subtracts its XP:
 
 ```js
-updateGoal(id, {
-  completed: true
-});
+toggleGoalCompletion(id, true);
 ```
 
-This is useful because UI interactions do not need separate update functions for every field.
+Repeating goals automatically clear `completed` and `completedDay` on the next local
+calendar day without subtracting earned XP. This runs on render (including loading
+local or cloud data), at local midnight, and when returning to the page. A periodic
+clock check also handles timezone changes. Non-repeating goals keep their completion.
 
 ---
 
@@ -284,6 +324,7 @@ function createSkill(data) {
     name: data.name.trim(),
     goal: data.goal.trim(),
     xp: 0,
+    lifeAreaId: "",
   });
 
   saveState();
@@ -316,6 +357,14 @@ function updateSkill(id, patch) {
 
 ```js
 function deleteSkill(id) {
+  const skill = state.skills.find(item => item.id === id);
+  if (!skill) return;
+  if (state.goals.some(goal => goal.skillId === id) ||
+      state.completionHistory.some(record => record.skillId === id)) {
+    alert("This Skill has goals or recorded progress and cannot be deleted.");
+    return;
+  }
+  if (!confirm(`Delete skill "${skill.name}"?`)) return;
   state.skills = state.skills.filter((item) => item.id !== id);
   saveState();
   render();
@@ -326,13 +375,19 @@ function deleteSkill(id) {
 
 # 6. Why rendering is centralized
 
-The app uses:
+The app uses a central `render()` entry point. Its main responsibilities are:
 
 ```js
 function render() {
+  closeGoalMenu();
+  resetRepeatingGoals();
+  renderedDay = getDayKey();
+  checkStreakExpiry();
   renderProfile();
-  renderGoals();
   renderSkills();
+  statisticsView?.render();
+  if (isSkillPage) renderGoalTree();
+  else renderGoals();
 }
 ```
 
@@ -392,8 +447,9 @@ const totalXP = skills.reduce((sum, s) => sum + s.xp, 0);
 
 The type of a goal never changes what it pays out. XP is stored on the goal, so editing a
 step into an arc, completing a repeating goal twice on different days, or un-completing a
-goal all move exactly the same amount of XP. The daily streak follows the same rule: only a
-goal with `repeatsDaily: true` counts toward it, whatever its type.
+goal manually all move exactly the same amount of XP. The automatic daily reset preserves
+earned XP, so completing a repeating goal on a new day awards XP again. Completing any
+goal counts toward the daily streak, whatever its type.
 
 Progression is exponential: reaching level N requires (N-1)^2 * 100 total XP.
 
@@ -461,6 +517,9 @@ The visual code can remain mostly unchanged.
 
 # 10. Suggested next architecture
 
+This section is a hypothetical future refactor, not the current file structure or a task
+to perform when adding a feature. Preserve the interface contract and existing persistence.
+
 For a larger version:
 
 ```text
@@ -492,3 +551,79 @@ database/
 ```
 
 This keeps DOM rendering separate from data access and business logic.
+
+# Statistics (schema v3)
+
+`statistics-model.js` holds DOM-free calendar, migration, aggregation and Life Area logic.
+`statistics.js` renders the Statistics section in `index.html`. No chart dependency is used:
+activity and progression use CSS, and the radar uses SVG with an adjacent text breakdown.
+
+Each newly recorded completion adds one fact to `state.completionHistory`:
+
+```js
+{
+  id: "completion-uuid",
+  goalId: "goal-uuid",
+  skillId: "skill-that-received-xp",
+  completionDate: "2026-10-04", // logical local calendar date
+  xpAwarded: 30
+}
+```
+
+`goal.activeCompletionId` links the checked state to its reward. Manual undo removes that
+record and subtracts its recorded reward from its recorded Skill, even after the Goal is
+edited. For legacy completions without a record, undo retains the previous behavior of
+subtracting the Goal's current reward from its current Skill. Automatic daily reset clears
+only the checked state, completion date and active link; past records and earned XP remain.
+Deleting a Goal preserves its completion history. Skill deletion is blocked while Goals or
+history reference it. Old orphaned Goals remain editable so they can be reassigned, but
+cannot earn XP until they reference an existing Skill.
+
+A Life Area is `{ id, name }` in `state.lifeAreas`. `skill.lifeAreaId` is the sole assignment
+field. `Statistics.createArea()` validates a nonblank name and at least one existing Skill
+before changing anything. Creation and assignment are saved together. Skills can later move
+between Areas or become uncategorized. An Area can become empty afterwards; deleting it
+uncategorizes its Skills without touching Goals, XP or history.
+
+`Statistics.weekly(state, monday)` filters completion dates into a Monday-inclusive,
+next-Monday-exclusive range, then calculates:
+
+- **Weekly Activity:** record counts for seven calendar days, including zero-XP completions.
+- **Top Skill Progression:** sums of `xpAwarded` by Skill, sorted by earned XP; the view shows
+  up to five Skills with positive weekly XP. Uncategorized Skills participate normally.
+- **Life Areas:** current Area assignments group weekly Skill XP. Each percentage is Area XP
+  divided by XP of all categorized Skills, including those outside the top five. Moving a
+  Skill changes the grouping for previous weeks too. Uncategorized XP never enters this
+  denominator. Display percentages are rounded to one decimal place.
+
+All modules share one in-memory Monday date. Future weeks are disabled. Calendar arithmetic
+uses local dates rather than UTC conversion or fixed 24-hour durations. Fewer than three
+Areas shows setup guidance; no categorized XP shows an empty state. Three to eight Areas
+use a radar; more than eight use the complete percentage list. No weekly aggregates are saved.
+
+Migration preserves existing XP and completed Goals without inventing historical rewards.
+Missing new arrays default to empty, old Skills are uncategorized, and `statisticsStartedOn`
+records when reliable tracking began. Earlier dates show unavailable data rather than zero.
+Migration is idempotent for both
+localStorage and cloud documents. Whole-document cloud sync still uses last-write-wins and
+does not merge simultaneous changes from multiple devices.
+
+## Verification
+
+From `front/`, run:
+
+```sh
+gjs tests/goal-model.js
+gjs tests/daily-reset.js
+gjs tests/streak-motion.js
+gjs tests/statistics-model.js
+gjs tests/statistics-sync.js
+TZ=America/New_York gjs tests/statistics-model.js
+python3 tests/statistics-browser.py webkit
+python3 tests/statistics-browser.py webkit 390 844
+```
+
+The JavaScript tests also support Node. The browser runner accepts a Chromium executable
+instead of `webkit`. It uses isolated browser storage, fixture data and a localhost server;
+it omits Firebase scripts so tests cannot change real cloud data. Screenshots are saved to
+`/tmp/statistics-<width>.png`.

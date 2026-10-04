@@ -8,13 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <header class="topbar">
     <nav class="nav">
       <button class="nav-item active" data-section="goals">Goals</button>
-      <button class="nav-item" data-section="skills">Skills</button>
       <button class="nav-item" data-section="statistics">Statistics</button>
     </nav>
 
@@ -24,8 +23,6 @@
         <input id="searchInput" type="search" placeholder="Find a goal or skill..." />
       </label>
       <a class="auth-btn" id="authBtn" href="login.html" title="Sign in to sync progress">Sign in</a>
-      <button class="icon-btn" aria-label="Notifications">◔</button>
-      <button class="icon-btn" aria-label="Settings">⚙</button>
     </div>
   </header>
 
@@ -117,6 +114,52 @@
       </section>
     </aside>
   </main>
+
+  <main id="statisticsPage" class="statistics-page" hidden>
+    <div class="statistics-heading">
+      <div><h1>Statistics</h1></div>
+      <div class="week-picker" aria-label="Select calendar week">
+        <button id="previousWeek" class="secondary-btn" aria-label="Previous week">←</button>
+        <strong id="selectedWeek" aria-live="polite"></strong>
+        <button id="nextWeek" class="secondary-btn" aria-label="Next week">→</button>
+      </div>
+    </div>
+    <p id="statisticsCoverage" class="statistics-notice" role="status"></p>
+    <div class="statistics-grid">
+      <section class="panel statistics-card activity-card" aria-labelledby="activityTitle">
+        <div class="statistics-card-head"><div><h2 id="activityTitle">Weekly Activity</h2><p class="statistics-muted">Goals completed each day</p></div><span id="weeklyGoalCount" class="statistics-total"></span></div>
+        <div id="activityChart" class="activity-chart" aria-label="Daily completed goals"></div>
+        <p id="activityEmpty" class="statistics-muted"></p>
+      </section>
+      <section class="panel statistics-card" aria-labelledby="progressionTitle">
+        <h2 id="progressionTitle">Top Skill Progression</h2>
+        <p class="statistics-muted">XP earned during this week</p>
+        <ol id="skillProgression" class="skill-progression"></ol>
+        <p id="progressionEmpty" class="statistics-empty"></p>
+      </section>
+      <section class="panel statistics-card life-areas-card" aria-labelledby="areasTitle">
+        <div class="statistics-card-head"><div><h2 id="areasTitle">Life Areas</h2><p class="statistics-muted">Share of your weekly focus</p></div><button id="manageLifeAreas" class="secondary-btn">Manage Life Areas</button></div>
+        <div id="areaEmpty" class="statistics-empty"></div>
+        <div class="area-visualization"><div id="areaRadar"></div><ul id="areaBreakdown" class="area-breakdown"></ul></div>
+        <p class="statistics-muted">Percentages include only categorized Skills. Moving a Skill changes its Life Area for all weeks.</p>
+      </section>
+    </div>
+  </main>
+
+  <dialog class="modal" id="lifeAreasModal" aria-labelledby="lifeAreasModalTitle">
+    <div class="modal-card life-areas-manager">
+      <div class="modal-head"><h2 id="lifeAreasModalTitle">Life Areas</h2><button type="button" class="close-btn" data-close="lifeAreasModal" aria-label="Close Life Areas">×</button></div>
+      <form id="createLifeAreaForm">
+        <h3>Create a Life Area</h3>
+        <label>Name<input id="lifeAreaName" required maxlength="50" placeholder="e.g. Learning" /></label>
+        <fieldset><legend>Assign at least one existing Skill</legend><div id="lifeAreaSkills" class="area-skill-options"></div></fieldset>
+        <p id="lifeAreaError" class="form-error" role="alert"></p>
+        <button class="primary-btn" id="createLifeArea" type="submit" disabled>Create Life Area</button>
+      </form>
+      <section aria-labelledby="existingAreasTitle"><h3 id="existingAreasTitle">Your Life Areas</h3><div id="existingLifeAreas"></div></section>
+      <section aria-labelledby="assignmentsTitle"><h3 id="assignmentsTitle">Skill assignments</h3><p class="statistics-muted">Each Skill can belong to one Life Area, or stay uncategorized.</p><div id="skillAreaAssignments"></div></section>
+    </div>
+  </dialog>
 
   <dialog class="modal" id="goalModal">
     <form method="dialog" class="modal-card" id="goalForm">
@@ -279,6 +322,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase.init.js?v=2"></script>
-  <script src="app.js?v=8"></script>
+  <script src="statistics-model.js?v=1"></script>
+  <script src="statistics.js?v=2"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

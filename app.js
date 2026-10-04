@@ -10,6 +10,10 @@ const defaultState = {
   goals: [],
 
   skills: [],
+
+  lifeAreas: [],
+  completionHistory: [],
+  statisticsStartedOn: "",
 };
 
 // ===============================
@@ -109,7 +113,7 @@ const legacyGoalTypes = {
   },
 };
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function getGoalTypeMeta(type) {
   return (
@@ -282,6 +286,7 @@ function migrateGoals(goals) {
 }
 
 function migrateState(loaded) {
+  loaded = Statistics.normalize(loaded);
   return {
     ...loaded,
 
@@ -379,6 +384,7 @@ function readStoredState() {
     const parsed = JSON.parse(saved);
 
     return {
+      ...parsed,
       profile:
         parsed.profile ??
         structuredClone(defaultState.profile),
@@ -416,7 +422,7 @@ function readStoredState() {
 // Migration is idempotent and deliberately does not save: bumping
 // updatedAt here would make a stale local document look newer than the
 // cloud copy and lose the sign-in last-write-wins comparison. The
-// migrated shape is written out with the next real change.
+// migrated shape is persisted at startup without changing the edit timestamp.
 function loadState() {
   return migrateState(
     readStoredState()
@@ -424,8 +430,8 @@ function loadState() {
 }
 
 
-function saveState() {
-  state.updatedAt = Date.now();
+function saveState({ maintenance = false } = {}) {
+  if (!maintenance) state.updatedAt = Date.now();
 
   localStorage.setItem(
     STORAGE_KEY,
@@ -440,15 +446,21 @@ function saveState() {
 // MAIN RENDER
 // ===============================
 
+let renderedDay = "";
+let dayRefreshTimer = null;
+
 function render() {
   // render() rebuilds every card, so an open menu would lose its
   // anchor. Close it before the DOM it points at is replaced.
   closeGoalMenu();
 
+  resetRepeatingGoals();
+  renderedDay = getDayKey();
   checkStreakExpiry();
 
   renderProfile();
   renderSkills();
+  statisticsView?.render();
 
   if (isSkillPage) {
     renderGoalTree();
@@ -482,6 +494,44 @@ function getDayKey(offsetDays = 0) {
   return `${year}-${month}-${date}`;
 }
 
+// A new local day clears only the daily checkmark, never earned XP.
+function resetRepeatingGoals() {
+  const today = getDayKey();
+  let changed = false;
+
+  for (const goal of state.goals) {
+    if (
+      isRepeatingGoal(goal) &&
+      goal.completed &&
+      goal.completedDay !== today
+    ) {
+      goal.completed = false;
+      goal.completedDay = "";
+      goal.activeCompletionId = "";
+      changed = true;
+    }
+  }
+
+  if (changed) saveState({ maintenance: true });
+  return changed;
+}
+
+function refreshLocalDay() {
+  clearTimeout(dayRefreshTimer);
+
+  if (renderedDay !== getDayKey()) render();
+
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+
+  // Recheck the clock periodically as well, in case the timezone changes.
+  dayRefreshTimer = setTimeout(
+    refreshLocalDay,
+    Math.min(60_000, midnight.getTime() - now.getTime())
+  );
+}
+
 function bumpStreak() {
   const today = getDayKey();
   const yesterday = getDayKey(-1);
@@ -501,8 +551,6 @@ function bumpStreak() {
   }
 
   state.streak.date = today;
-
-  saveState();
 }
 
 function checkStreakExpiry() {
@@ -520,7 +568,7 @@ function checkStreakExpiry() {
     state.streak.count = 0;
     state.streak.date = "";
 
-    saveState();
+    saveState({ maintenance: true });
   }
 }
 
@@ -2226,28 +2274,14 @@ function renderGoalTreeNode(
   actions.className =
     "goal-tree-actions";
 
-  const edit =
-    document.createElement("button");
-
-  edit.className =
-    "mini-btn edit-goal";
-
-  edit.type = "button";
-  edit.textContent = "Edit";
-
-  const del =
-    document.createElement("button");
-
-  del.className =
-    "mini-btn danger delete-goal";
-
-  del.type = "button";
-  del.textContent = "Delete";
-
-  actions.append(
-    edit,
-    del
-  );
+  const menuTrigger = document.createElement("button");
+  menuTrigger.type = "button";
+  menuTrigger.className = "goal-menu-trigger";
+  menuTrigger.setAttribute("aria-haspopup", "menu");
+  menuTrigger.setAttribute("aria-expanded", "false");
+  menuTrigger.setAttribute("aria-label", "Goal actions");
+  menuTrigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>';
+  actions.append(createGoalActionsMenu(menuTrigger, goal));
 
   item.append(actions);
 
@@ -2259,20 +2293,6 @@ function renderGoalTreeNode(
         input.checked,
         item
       );
-    }
-  );
-
-  edit.addEventListener(
-    "click",
-    () => {
-      openGoalModal(goal);
-    }
-  );
-
-  del.addEventListener(
-    "click",
-    () => {
-      deleteGoal(goal.id);
     }
   );
 
@@ -2308,6 +2328,7 @@ function renderGoalTreeNode(
 
 // CREATE
 function createGoal(data) {
+  if (!state.skills.some(skill => skill.id === data.skillId)) return;
   const newGoal = {
     id: crypto.randomUUID(),
 
@@ -2338,6 +2359,7 @@ function createGoal(data) {
       false,
 
     completedDay: "",
+    activeCompletionId: "",
 
     createdAt:
       new Date()
@@ -2379,6 +2401,9 @@ function toggleGoalCompletion(
   completed,
   anchorEl = null
 ) {
+  // A click may arrive before the midnight timer after a suspended tab wakes.
+  if (resetRepeatingGoals()) render();
+
   const goal =
     state.goals.find(
       (item) =>
@@ -2396,13 +2421,20 @@ function toggleGoalCompletion(
     return;
   }
 
+  const previousRecord = state.completionHistory.find(record => record.id === goal.activeCompletionId);
+  const rewardSkillId = !completed && previousRecord ? previousRecord.skillId : goal.skillId;
   const skill =
     state.skills.find(
       (item) =>
-        item.id === goal.skillId
+        item.id === rewardSkillId
     );
 
-  const xp = Number(goal.xp) || 0;
+  if (!skill) {
+    alert("Assign this goal to an existing Skill before changing its completion.");
+    render();
+    return;
+  }
+  const xp = Math.max(0, Number(!completed && previousRecord ? previousRecord.xpAwarded : goal.xp) || 0);
 
   const prevSkillXp =
     Number(skill?.xp) || 0;
@@ -2496,6 +2528,17 @@ function toggleGoalCompletion(
     bumpStreak();
   }
 
+  if (completed) {
+    const record = {
+      id: crypto.randomUUID(), goalId: goal.id, skillId: skill.id,
+      completionDate: getDayKey(), xpAwarded: nextSkillXp - prevSkillXp,
+    };
+    state.completionHistory.push(record);
+    goal.activeCompletionId = record.id;
+  } else {
+    state.completionHistory = state.completionHistory.filter(record => record.id !== goal.activeCompletionId);
+    goal.activeCompletionId = "";
+  }
   goal.completed = completed;
 
   goal.completedDay =
@@ -2523,6 +2566,8 @@ function updateGoal(
   if (!goal) {
     return;
   }
+
+  if (patch.skillId !== undefined && !state.skills.some(skill => skill.id === patch.skillId)) return;
 
   Object.assign(
     goal,
@@ -2865,6 +2910,7 @@ function createSkill(data) {
       data.goal.trim(),
 
     xp: 0,
+    lifeAreaId: "",
   };
 
   state.skills.push(
@@ -2915,6 +2961,10 @@ function deleteSkill(id) {
     return;
   }
 
+  if (state.goals.some(goal => goal.skillId === id) || state.completionHistory.some(record => record.skillId === id)) {
+    alert("This Skill has goals or recorded progress. Keep it to preserve your history; you can rename it or change its Life Area.");
+    return;
+  }
   const confirmed =
     confirm(
       `Delete skill "${skill.name}"?`
@@ -3263,21 +3313,12 @@ document
           "active"
         );
 
-        const section =
-          item.dataset.section;
-
-        if (
-          section === "skills"
-        ) {
-          document
-            .querySelector(
-              ".skills-card"
-            )
-            .scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
-        }
+        const section = item.dataset.section;
+        document.querySelector(".dashboard").hidden = section === "statistics";
+        const statisticsPage = document.querySelector("#statisticsPage");
+        if (statisticsPage) statisticsPage.hidden = section !== "statistics";
+        if (els.searchInput) els.searchInput.closest("label").hidden = section === "statistics";
+        statisticsView?.render();
 
         if (
           section === "goals"
@@ -3306,6 +3347,8 @@ const LOGIN_PAGE = "login.html";
 
 let currentUser = null;
 let syncTimer = null;
+let cloudReady = false;
+let cloudPull = null;
 
 function renderAuthButton() {
   if (!els.authBtn) {
@@ -3379,7 +3422,7 @@ function renderAuthButton() {
 }
 
 async function pushToCloud() {
-  if (!currentUser) {
+  if (!currentUser || !cloudReady) {
     return;
   }
 
@@ -3389,7 +3432,7 @@ async function pushToCloud() {
     .doc(currentUser.uid)
     .set({
       state: JSON.stringify(state),
-      updatedAt: Date.now(),
+      updatedAt: state.updatedAt,
     });
 }
 
@@ -3397,7 +3440,9 @@ function queueCloudSync() {
   clearTimeout(syncTimer);
 
   syncTimer = setTimeout(() => {
-    if (!currentUser) {
+    if (!currentUser) return;
+    if (!cloudReady) {
+      reconcileCloud();
       return;
     }
 
@@ -3415,6 +3460,7 @@ async function pullFromCloud() {
     return;
   }
 
+  const userId = currentUser.uid;
   const ref = firebase
     .firestore()
     .collection("users")
@@ -3423,7 +3469,9 @@ async function pullFromCloud() {
   const snapshot =
     await ref.get();
 
+  if (currentUser?.uid !== userId) return;
   if (!snapshot.exists) {
+    cloudReady = true;
     await pushToCloud();
     return;
   }
@@ -3438,6 +3486,8 @@ async function pullFromCloud() {
     Number(state.updatedAt) || 0;
 
   if (serverTime <= localTime) {
+    cloudReady = true;
+    await pushToCloud();
     return;
   }
 
@@ -3456,9 +3506,19 @@ async function pullFromCloud() {
   // A cloud document can be older than this build, so it goes through
   // the same migration as the local one before it is used.
   state = migrateState(remoteState);
+  state.updatedAt = serverTime;
+  cloudReady = true;
 
-  saveState();
+  saveState({ maintenance: true });
   render();
+}
+
+function reconcileCloud() {
+  if (cloudPull) return cloudPull;
+  cloudPull = pullFromCloud()
+    .catch(error => console.warn("Cloud sync failed. Progress is saved locally.", error))
+    .finally(() => { cloudPull = null; });
+  return cloudPull;
 }
 
 function initAuth() {
@@ -3501,18 +3561,12 @@ function initAuth() {
     .onAuthStateChanged(
       (user) => {
         currentUser = user;
+        cloudReady = false;
 
         renderAuthButton();
 
         if (user) {
-          pullFromCloud().catch(
-            (error) => {
-              console.warn(
-                "Sync on sign-in failed.",
-                error
-              );
-            }
-          );
+          reconcileCloud();
         }
       }
     );
@@ -3523,6 +3577,26 @@ function initAuth() {
 // INITIAL RENDER
 // ===============================
 
+const statisticsView = createStatisticsView({
+  getState: () => state,
+  save: () => { saveState(); render(); },
+});
+
 initAuth();
 
 render();
+// Persist schema additions without making old local progress look newer than cloud data.
+saveState({ maintenance: true });
+
+refreshLocalDay();
+window.addEventListener("focus", refreshLocalDay);
+window.addEventListener("pageshow", refreshLocalDay);
+window.addEventListener("online", () => {
+  if (currentUser) {
+    cloudReady = false;
+    reconcileCloud();
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refreshLocalDay();
+});
