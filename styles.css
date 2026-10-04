@@ -1785,3 +1785,75 @@ button:disabled { cursor: default; opacity: .4; }
 @media (prefers-reduced-motion: reduce) {
   #statisticsPage .is-animating { transition: none !important; }
 }
+
+/* Goals hierarchy: columns carry the accent, cards remain quiet surfaces. */
+.goal-list { border: 0; padding: 0; background: transparent; }
+.goal-card { border-color: rgba(158,180,200,.14); background: rgba(17,40,58,.75); box-shadow: none; }
+.goal-column.step .goal-card, .goal-tree-item.step { padding: 10px; }
+.goal-column.quest .goal-card, .goal-tree-item.quest { padding: 13px; }
+.goal-column.arc .goal-card, .goal-tree-item.arc { padding: 16px; }
+.goal-column.step .goal-card h3, .goal-tree-item.step > .goal-tree-top .goal-tree-title { font-size: 14px; font-weight: 550; }
+.goal-column.quest .goal-card h3, .goal-tree-item.quest > .goal-tree-top .goal-tree-title { font-size: 15px; font-weight: 600; }
+.goal-column.arc .goal-card h3, .goal-tree-item.arc > .goal-tree-top .goal-tree-title { font-size: 16px; font-weight: 650; }
+.goal-column.arc .goal-card { border-top: 2px solid color-mix(in srgb, var(--goal-arc) 30%, transparent); }
+.goal-card-top, .goal-tree-top { display: grid; grid-template-columns: 18px minmax(0,1fr); align-items: start; column-gap: 8px; row-gap: 5px; }
+.goal-card h3, .goal-tree-title { min-width: 0; overflow-wrap: anywhere; line-height: 1.4; color: var(--text); }
+.goal-check { margin-top: 2px; }
+.goal-card .goal-xp, .goal-tree-item > .goal-tree-top .goal-tree-xp { grid-column: 2; color: #91adc0; font-size: 11px; font-weight: 500; line-height: 1.4; }
+.goal-description, .goal-tree-desc { min-height: 0; margin: 7px 0 8px 26px; overflow-wrap: anywhere; }
+.goal-metadata { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 0 26px; min-width: 0; }
+.goal-metadata:has(> [hidden]):not(:has(> :not([hidden]))) { display: none; }
+.goal-metadata .goal-skill, .goal-metadata .goal-parent { margin: 0; padding: 3px 7px; border: 0; border-radius: 5px; background: rgba(158,180,200,.08); color: #a7becf; font-size: 11px; line-height: 1.5; max-width: 100%; overflow-wrap: anywhere; }
+.goal-metadata .goal-parent { color: #91a9bc; }
+.goal-parent-title { color: #b2c5d4; }
+.goal-card-actions { margin-top: 5px; }
+.goal-tree-item { border-color: rgba(158,180,200,.14); border-left-width: 2px; background: rgba(17,40,58,.6); box-shadow: none; }
+.goal-tree-item.step { border-left-color: color-mix(in srgb, var(--goal-step) 45%, transparent); }
+.goal-tree-item.quest { border-left-color: color-mix(in srgb, var(--goal-quest) 45%, transparent); }
+.goal-tree-item.arc { border-left-color: color-mix(in srgb, var(--goal-arc) 45%, transparent); }
+.goal-card.completed, .goal-tree-item.completed { border-color: rgba(158,180,200,.10); background: rgba(5,21,34,.75); box-shadow: none; }
+.goal-column .goal-card.completed h3, .goal-tree-item.completed > .goal-tree-top .goal-tree-title { color: #96abba; font-weight: 500; text-decoration-color: rgba(150,171,186,.4); }
+.goal-card.completed .goal-xp, .goal-tree-item.completed > .goal-tree-top .goal-tree-xp { color: #8097a9; }
+.goal-card.completed .goal-description, .goal-tree-item.completed > .goal-tree-desc { color: #8ca2b4; opacity: 1; }
+.goal-card.completed .goal-metadata > span { color: #8fa6b7; background: rgba(158,180,200,.035); opacity: 1; }
+.goal-card.completed .goal-parent-title { color: #9aafbf; }
+.goal-card.completed .goal-state, .goal-tree-item.completed > .goal-state { color: #a4c5b6; background: rgba(29,244,161,.035); border-color: rgba(29,244,161,.16); }
+.goal-state::before { box-shadow: none; }
+.goal-repeat-badge { border-color: rgba(158,180,200,.12); margin-top: 6px; margin-bottom: 4px; letter-spacing: .03em; }
+/* A completed parent never dims its active children. */
+.goal-tree-item.completed .goal-tree-item:not(.completed) > .goal-tree-top .goal-tree-title { color: var(--text); text-decoration: none; }
+.goal-tree-item.completed .goal-tree-item:not(.completed) > .goal-tree-top .goal-tree-xp { color: #91adc0; }
+.goal-tree-item.completed .goal-tree-item:not(.completed) > .goal-tree-desc { color: var(--muted); opacity: 1; }
+/* Two aligned progress columns on wide screens, one on mobile. */
+.skills-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.skill-row { border: 0; border-bottom: 1px solid rgba(158,180,200,.12); border-radius: 0; padding: 13px 0; background: transparent; }
+.skill-row { min-width: 0; container-type: inline-size; }
+.skill-top { display: grid; grid-template-columns: minmax(0,1fr) auto 30px; gap: 10px; align-items: center; }
+.skill-top > div { display: grid; grid-template-columns: minmax(0,1fr) 44px; gap: 8px; align-items: baseline; min-width: 0; }
+.skill-row .skill-name { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.skill-level { text-align: right; white-space: nowrap; }
+.skill-points { min-width: 62px; text-align: right; font-variant-numeric: tabular-nums; }
+.skill-row .progress { margin-right: 40px; margin-top: 8px; height: 4px; }
+.skill-menu-trigger { background: transparent; flex-shrink: 0; }
+.skill-row:focus-within, .skill-row:hover { background: rgba(158,180,200,.025); }
+.skill-row .skill-name:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 3px; }
+@container (max-width: 230px) {
+  .skill-top { grid-template-columns: minmax(0, 1fr) auto 30px; gap: 5px; }
+  .skill-top > div { grid-template-columns: minmax(0, 1fr); gap: 1px; }
+  .skill-level { text-align: left; }
+  .skill-points { min-width: 0; }
+  .skill-row .progress { margin-right: 35px; }
+}
+@media (max-width: 720px) {
+  .skills-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* Keep completion controls keyboard accessible without altering their appearance. */
+.goal-check input { display: block; position: absolute; width: 18px; height: 18px; margin: 0; opacity: 0; }
+@media (max-width: 480px) {
+  .skill-top { gap: 6px; }
+  .skill-top > div { grid-template-columns: minmax(0,1fr) 38px; gap: 5px; }
+  .skill-points { min-width: 54px; }
+  .goal-tree-list .goal-tree-list { margin-left: 6px; padding-left: 8px; }
+}
+
+.goal-card > .goal-state, .goal-tree-item > .goal-state { margin: 8px 0 6px 26px; }

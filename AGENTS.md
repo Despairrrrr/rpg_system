@@ -15,8 +15,8 @@ them; update the documentation alongside that change.
 - Every Goal, both on the dashboard and in the Skill detail tree, has one **…**
   actions trigger. Its menu contains **Edit** and **Delete**. Reuse
   `createGoalActionsMenu()` and `GOAL_MENU_ITEMS` in `app.js`; do not replace the tree
-  menu with permanently visible Edit/Delete buttons. Skill rows are separate and
-  retain their own edit/delete controls.
+  menu with permanently visible Edit/Delete buttons. Skill rows use this shared menu mechanism with Skill-specific Edit/Delete handlers;
+  do not restore permanent action buttons or hover-only controls.
 - The Statistics **Life Areas** dialog has no **+ Create a Skill** button. It assigns
   existing Skills. Skill creation remains in the dashboard's Skills panel. Do not
   restore `createStatisticsSkill` or the removed `addSkill` view callback.
@@ -61,3 +61,8 @@ them; update the documentation alongside that change.
   shared assets. Keep `CRUD.md` and `README.md` consistent with intentional product
   changes. The proposed REST backend in CRUD documentation is hypothetical, not an
   instruction to replace the current persistence layer.
+
+- Goal columns retain structural accent borders; inner cards use softer surfaces.
+  Step/Quest/Arc differ subtly in padding and title size. Completed cards are quieter
+  without dimming active child Goals. XP is secondary and Skill/parent metadata uses
+  compact wrapping tags. Skills use two aligned progress columns on wide screens and one on screens up to 720px.

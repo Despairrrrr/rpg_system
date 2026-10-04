@@ -12,7 +12,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Header actions | Search and sign-in; no inactive notification/settings buttons | `index.html` |
 | Dashboard Goals | One **…** menu containing Edit and Delete | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
 | Goals inside a Skill | The same **…** menu; no permanent Edit/Delete buttons | `renderGoalTreeNode()`, `createGoalActionsMenu()` |
-| Skill rows | Keep their own edit/delete buttons and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
+| Skill rows | Aligned progress list with **… → Edit / Delete** and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
 | Skill creation | **+ Add skill** in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
 | Statistics → Life Areas | Create/rename/delete Areas and assign existing Skills; no **+ Create a Skill** button | `#lifeAreasModal`, `createStatisticsView()` |
 | Statistics overview | Week selector plus Goals completed and XP earned only; no Active Skills metric | `#weekSummary`, `#summaryGoals`, `#summaryXp` |
@@ -667,3 +667,26 @@ STATISTICS_TEST_SCRIPT=statistics-polish-browser.js STATISTICS_REDUCED_MOTION=1 
 
 These check entry and interrupted week transitions, summaries, zero/untracked states,
 uncategorized rewards, 3/4/6/8/9 Areas, long names, overflow, and unchanged application data.
+
+## Goals page visual hierarchy
+
+Columns keep their neon accent borders while inner lists have no extra frame and cards
+use subdued surfaces. Step/Quest/Arc share one layout with progressively larger padding
+and title sizes. XP sits below the title in smaller, muted text. Completed cards keep a
+readable title, state badge and usable controls but lose the bright outline/glow. Completed
+parents do not visually mark active tree children as completed. Empty descriptions are
+hidden, and Skill/parent metadata wraps into compact tags without truncating information.
+
+The Skills panel uses two progress columns on wide screens and one at viewport widths
+up to 720px. In compact columns the level moves below the name to keep values readable.
+Names, levels, XP values and bars
+align between rows; long names wrap. Both page templates use a visible, labelled overflow
+trigger instead of permanent Edit/Delete buttons. `createGoalActionsMenu()` accepts optional
+action descriptors and an accessible menu label, reusing positioning, keyboard navigation,
+Escape/focus return and click-away dismissal. Skill handlers still call the original
+`openSkillModal()` and `deleteSkill()`; all validation and deletion restrictions remain.
+Goal completion checkboxes remain keyboard focusable. No Goal/Skill/XP or persistence rules
+changed. Optional cross-highlighting of Skills was not added; existing Skill links remain.
+
+Browser check: `STATISTICS_TEST_SCRIPT=goals-ui-browser.js python3 tests/statistics-browser.py webkit`
+(add `390 844` for mobile or `1024 900` for medium width).

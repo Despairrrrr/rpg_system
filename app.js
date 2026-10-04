@@ -1316,12 +1316,15 @@ function positionGoalMenu() {
 }
 
 
-function openGoalMenu(trigger, goal) {
+function openGoalMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal actions") {
+  closeGoalMenu();
   const menu =
     getGoalMenu();
 
   menu.trigger = trigger;
   menu.goal = goal;
+  menu.actions = actions;
+  menu.el.setAttribute("aria-label", label);
 
   trigger.setAttribute(
     "aria-expanded",
@@ -1409,7 +1412,7 @@ function getGoalMenu() {
           closeGoalMenu();
 
           if (goal) {
-            GOAL_MENU_ITEMS[index].run(goal);
+            goalMenu.actions[index].run(goal);
           }
         }
       );
@@ -1470,7 +1473,7 @@ function getGoalMenu() {
 
 // Roving focus inside the menu, one trigger per card. Clicking the
 // same trigger again toggles it shut.
-function createGoalActionsMenu(trigger, goal) {
+function createGoalActionsMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal actions") {
   trigger.addEventListener(
     "click",
     () => {
@@ -1486,7 +1489,7 @@ function createGoalActionsMenu(trigger, goal) {
         return;
       }
 
-      openGoalMenu(trigger, goal);
+      openGoalMenu(trigger, goal, actions, label);
     }
   );
 
@@ -1502,7 +1505,7 @@ function createGoalActionsMenu(trigger, goal) {
 
       event.preventDefault();
 
-      openGoalMenu(trigger, goal);
+      openGoalMenu(trigger, goal, actions, label);
 
       const items =
         getGoalMenu().items;
@@ -1738,7 +1741,8 @@ function renderGoals() {
         ".goal-description"
       ).textContent =
         goal.description ||
-        "No description";
+        "";
+      card.querySelector(".goal-description").hidden = !goal.description;
 
       const skillEl =
         card.querySelector(
@@ -1935,23 +1939,12 @@ function renderSkills() {
     ).style.width =
       `${info.progress}%`;
 
-    row.querySelector(
-      ".edit-skill"
-    ).addEventListener(
-      "click",
-      () => {
-        openSkillModal(skill);
-      }
-    );
-
-    row.querySelector(
-      ".delete-skill"
-    ).addEventListener(
-      "click",
-      () => {
-        deleteSkill(skill.id);
-      }
-    );
+    const trigger = row.querySelector(".skill-menu-trigger");
+    trigger.setAttribute("aria-label", `Actions for ${skill.name}`);
+    createGoalActionsMenu(trigger, skill, [
+      { label: "Edit", run: item => openSkillModal(item) },
+      { label: "Delete", run: item => deleteSkill(item.id) },
+    ], "Skill actions");
 
     els.skillsGrid.append(row);
   });
@@ -2243,7 +2236,8 @@ function renderGoalTreeNode(
 
   desc.textContent =
     goal.description ||
-    "No description";
+    "";
+  desc.hidden = !goal.description;
 
   item.append(desc);
 

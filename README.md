@@ -104,7 +104,7 @@ creates the Firebase user, later ones just sign it in.
   the viewport ends first, with arrow-key roaming, `Escape` to close and focus back on the
   trigger, and a click-away to dismiss. It calls `openGoalModal()` / `deleteGoal()` unchanged, so
   the `confirm()` on delete still applies. The Skill detail Goal tree uses this same menu;
-  only Skill rows retain their own permanent edit/delete buttons.
+  Skill rows use the same accessible menu with Skill-specific Edit/Delete actions.
 - Optional sign-in via a dedicated `login.html` page with a "Continue with Google" button, syncing progress across devices (last-write-wins).
 - Responsive layout.
 
@@ -199,3 +199,13 @@ The site is purely static — no server needed:
 Active streaks animate the flame silhouette and core independently; the frame stays steady with a faint breathing glow. Increases briefly flare the flame and roll the label; tier changes crossfade the frame. Initial rendering and resets do not celebrate. Reduced motion disables all badge animation, including when the preference changes mid-animation.
 
 Run presentation-state checks from `front` with `gjs tests/streak-motion.js` or `node tests/streak-motion.js`.
+
+### Goals and Skills presentation
+
+Goal columns carry the strong neon accents; inner cards use softer borders. Steps are
+compact, Quests medium, and Arcs slightly more spacious. Completed Goals are quieter, XP
+is secondary to the title, and Skill/parent metadata uses compact wrapping tags. Skills
+appear in two progress columns on wide screens and one on narrow screens (up to 720px),
+with a visible keyboard/touch-accessible
+**… → Edit / Delete** menu. These are presentation changes only; progression and data
+behavior remain unchanged.
