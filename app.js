@@ -1259,10 +1259,7 @@ function renderAvatar() {
 
   syncAvatarLabel(photo);
 
-  if (
-    photo &&
-    renderedPhoto === photo
-  ) {
+  if (renderedPhoto === photo) {
     return;
   }
 
@@ -1842,18 +1839,21 @@ function getGoalMenu() {
       event.preventDefault();
 
       // A disabled item cannot take focus, so it is stepped over instead
-      // of trapping the keyboard. Otherwise ArrowDown over the photo
-      // menu's disabled "Delete photo" would look like a dead key.
-      let target = next;
+      // of trapping the keyboard. The start is wrapped first, because
+      // ArrowDown on the last item points one past the end, and each
+      // step advances by one so the loop actually moves.
+      let target =
+        (next + items.length) %
+        items.length;
 
       for (let step = 0; step < items.length; step += 1) {
-        target =
-          (target + items.length) %
-          items.length;
-
         if (!items[target].disabled) {
           break;
         }
+
+        target =
+          (target + 1) %
+          items.length;
       }
 
       items[target].focus();
