@@ -1,7 +1,11 @@
 const STORAGE_KEY = "neonGoalTracker.v1";
 
 const defaultState = {
-  profile: { name: "User User" },
+  // `photo` is a data URL, kept small on purpose: the whole state is
+  // uploaded to Firestore as one JSON string and a document is capped at
+  // 1 MiB. Absent on existing documents, so every read goes through
+  // `readProfilePhoto()` rather than trusting the field to exist.
+  profile: { name: "User User", photo: "" },
 
   streak: { count: 0, date: "" },
 
@@ -353,6 +357,8 @@ const els = {
   profileForm: document.querySelector("#profileForm"),
   profileNameInput: document.querySelector("#profileNameInput"),
   profileName: document.querySelector("#profileName"),
+  profileAvatar: document.querySelector("#profileAvatar"),
+  profilePhotoInput: document.querySelector("#profilePhotoInput"),
   streakBadgeHost: document.querySelector("#streakBadgeHost"),
 
   xpValue: document.querySelector("#xpValue"),
@@ -1183,7 +1189,353 @@ function renderProfile() {
 
   els.xpBar.style.width =
     `${info.progress}%`;
+
+  renderAvatar();
 }
+
+
+// The photo lives in `state.profile.photo` as a small data URL and
+// travels with every state write, so it syncs through the existing
+// last-write-wins path instead of needing its own upload.
+const PHOTO_SIZE = 256;
+const PHOTO_QUALITY = 0.82;
+const PHOTO_RETRY_SIZE = 160;
+const PHOTO_RETRY_QUALITY = 0.7;
+const PHOTO_MAX_BYTES = 150000;
+const PHOTO_SOURCE_LIMIT = 8 * 1024 * 1024;
+let photoErrorTimer = 0;
+
+
+// Documents written before the photo existed have no field at all, and
+// a hand edited document could hold anything, so the value is validated
+// at the point of use.
+function readProfilePhoto() {
+  const photo =
+    state.profile?.photo;
+
+  return typeof photo === "string" &&
+    photo.startsWith("data:image/")
+    ? photo
+    : "";
+}
+
+
+// renderProfile() runs on every render, including while typing in the
+// search box, so the node is only rebuilt when the photo really changed.
+let renderedPhoto = null;
+
+function syncAvatarLabel(photo) {
+  const avatar =
+    els.profileAvatar;
+
+  if (!avatar) {
+    return;
+  }
+
+  const label =
+    photo
+      ? "Profile photo — change or delete"
+      : "Profile photo — add a photo";
+
+  avatar.setAttribute(
+    "aria-label",
+    label
+  );
+
+  avatar.title = label;
+}
+
+function renderAvatar() {
+  const avatar =
+    els.profileAvatar;
+
+  // The sidebar is optional markup on some pages.
+  if (!avatar) {
+    return;
+  }
+
+  const photo =
+    readProfilePhoto();
+
+  syncAvatarLabel(photo);
+
+  if (
+    photo &&
+    renderedPhoto === photo
+  ) {
+    return;
+  }
+
+  renderedPhoto = photo;
+
+  if (photo) {
+    const img =
+      document.createElement(
+        "img"
+      );
+
+    // Never injected as markup: a data URL is attacker supplied once the
+    // document is editable, and innerHTML would let it run script.
+    img.src = photo;
+
+    img.alt = "";
+
+    avatar.replaceChildren(img);
+  } else {
+    const plus =
+      document.createElement(
+        "span"
+      );
+
+    plus.className =
+      "avatar-plus";
+
+    plus.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    plus.textContent = "+";
+
+    avatar.replaceChildren(plus);
+  }
+}
+
+
+// Decoding goes through an object URL so a large source file is never
+// held as a data URL in memory, and the URL is released either way.
+function decodePhoto(file) {
+  return new Promise(
+    (resolve, reject) => {
+      const url =
+        URL.createObjectURL(
+          file
+        );
+
+      const img =
+        new Image();
+
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+
+        resolve(img);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+
+        reject(
+          new Error(
+            "That file could not be decoded as an image."
+          )
+        );
+      };
+
+      img.src = url;
+    }
+  );
+}
+
+
+// Centre crop, so the circle never shows a stretched photo, then a
+// bounded JPEG. The size cap is not arbitrary: the whole state is
+// uploaded as one JSON string and Firestore rejects documents over
+// 1 MiB. Returns "" when there is nothing decodable to draw.
+function encodeSquarePhoto(
+  img,
+  size,
+  quality
+) {
+  const width =
+    img.naturalWidth || 0;
+
+  const height =
+    img.naturalHeight || 0;
+
+  if (!width || !height) {
+    return "";
+  }
+
+  const side =
+    Math.min(width, height);
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+  canvas.width = size;
+  canvas.height = size;
+
+  canvas
+    .getContext("2d")
+    .drawImage(
+      img,
+      (width - side) / 2,
+      (height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      size,
+      size
+    );
+
+  try {
+    return (
+      canvas.toDataURL(
+        "image/jpeg",
+        quality
+      ) || ""
+    );
+  } catch (error) {
+    // A canvas that ended up tainted cannot be exported.
+    return "";
+  }
+}
+
+
+async function applyPhoto(file) {
+  if (
+    !file.type.startsWith("image/")
+  ) {
+    reportPhotoError(
+      "That file is not an image."
+    );
+
+    return;
+  }
+
+  if (
+    file.size > PHOTO_SOURCE_LIMIT
+  ) {
+    reportPhotoError(
+      "Pick an image under 8 MB."
+    );
+
+    return;
+  }
+
+  // A data URL is about a third larger than the bytes it carries.
+  const overCap = value =>
+    value.length * 0.75 > PHOTO_MAX_BYTES;
+
+  let photo = "";
+
+  try {
+    const img =
+      await decodePhoto(file);
+
+    photo =
+      encodeSquarePhoto(
+        img,
+        PHOTO_SIZE,
+        PHOTO_QUALITY
+      );
+
+    // One smaller pass covers a detailed photo that will not fit.
+    if (overCap(photo)) {
+      photo =
+        encodeSquarePhoto(
+          img,
+          PHOTO_RETRY_SIZE,
+          PHOTO_RETRY_QUALITY
+        );
+    }
+  } catch (error) {
+    console.warn(
+      "Could not read that image.",
+      error
+    );
+
+    reportPhotoError(
+      "That file could not be read as an image."
+    );
+
+    return;
+  }
+
+  if (
+    !photo ||
+    overCap(photo)
+  ) {
+    reportPhotoError(
+      "That image is too detailed to store. Try a smaller photo."
+    );
+
+    return;
+  }
+
+  state.profile.photo = photo;
+
+  saveState();
+  renderAvatar();
+  queueCloudSync();
+}
+
+
+function deletePhoto() {
+  if (!readProfilePhoto()) {
+    return;
+  }
+
+  delete state.profile.photo;
+
+  saveState();
+  renderAvatar();
+  queueCloudSync();
+}
+
+
+// There is no toast on this app, so the button itself carries the
+// message until the next render. The label is restored on a timer
+// rather than by a render, because a render with an unchanged photo
+// leaves the avatar node alone.
+function reportPhotoError(message) {
+  const avatar =
+    els.profileAvatar;
+
+  if (!avatar) {
+    return;
+  }
+
+  avatar.title = message;
+
+  clearTimeout(photoErrorTimer);
+
+  photoErrorTimer = setTimeout(
+    () => {
+      syncAvatarLabel(
+        readProfilePhoto()
+      );
+    },
+    4000
+  );
+}
+
+
+// Reuses the shared actions menu, so the avatar gets the same
+// positioning, keyboard handling and single-open behaviour as Goals and
+// Skills. The trigger doubles as the menu's subject because the menu
+// only calls `run` for a truthy one.
+const PHOTO_MENU_ITEMS = [
+  {
+    label: "Load a photo",
+    run: () => {
+      els.profilePhotoInput?.click();
+    },
+  },
+  {
+    label: "Delete photo",
+    modifier: "goal-menu-item--danger",
+    // Visible but inert until there is something to delete. A disabled
+    // button never fires click, so the handler never runs.
+    disabled: () => !readProfilePhoto(),
+    run: () => {
+      deletePhoto();
+    },
+  },
+];
 
 
 // ===============================
@@ -1326,6 +1678,39 @@ function openGoalMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal ac
   menu.actions = actions;
   menu.el.setAttribute("aria-label", label);
 
+  // The menu element is shared, so the items are repainted per open
+  // instead of being frozen at creation. Callers that pass their own
+  // actions therefore get their own labels, modifiers and disabled
+  // states, and always exactly as many entries as there are items.
+  menu.items.forEach(
+    (item, index) => {
+      const descriptor =
+        actions[index];
+
+      if (!descriptor) {
+        return;
+      }
+
+      item.textContent =
+        descriptor.label;
+
+      item.className =
+        descriptor.modifier
+          ? `goal-menu-item ${descriptor.modifier}`
+          : "goal-menu-item";
+
+      // A descriptor may compute it, because whether there is a photo
+      // to delete is only known at open time.
+      item.disabled =
+        typeof descriptor.disabled ===
+          "function"
+          ? descriptor.disabled()
+          : Boolean(
+              descriptor.disabled
+            );
+    }
+  );
+
   trigger.setAttribute(
     "aria-expanded",
     "true"
@@ -1339,7 +1724,11 @@ function openGoalMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal ac
     "is-open"
   );
 
-  menu.items[0].focus();
+  // Focus the first item that can take it, so a leading disabled entry
+  // cannot swallow the open.
+  (menu.items.find(
+    (item) => !item.disabled
+  ) || menu.items[0]).focus();
 }
 
 
@@ -1452,10 +1841,22 @@ function getGoalMenu() {
 
       event.preventDefault();
 
-      items[
-        (next + items.length) %
-        items.length
-      ].focus();
+      // A disabled item cannot take focus, so it is stepped over instead
+      // of trapping the keyboard. Otherwise ArrowDown over the photo
+      // menu's disabled "Delete photo" would look like a dead key.
+      let target = next;
+
+      for (let step = 0; step < items.length; step += 1) {
+        target =
+          (target + items.length) %
+          items.length;
+
+        if (!items[target].disabled) {
+          break;
+        }
+      }
+
+      items[target].focus();
     }
   );
 
@@ -3090,6 +3491,34 @@ document
       els.profileModal.showModal();
     }
   );
+
+
+// Profile photo. The avatar is the trigger of the shared actions menu,
+// so Load a photo / Delete photo arrive with the same keyboard and
+// dismissal behaviour as Goal actions.
+if (els.profileAvatar) {
+  createGoalActionsMenu(
+    els.profileAvatar,
+    els.profileAvatar,
+    PHOTO_MENU_ITEMS,
+    "Profile photo actions"
+  );
+}
+
+els.profilePhotoInput?.addEventListener(
+  "change",
+  () => {
+    const file =
+      els.profilePhotoInput.files?.[0];
+
+    // Cleared first so choosing the same file twice still fires change.
+    els.profilePhotoInput.value = "";
+
+    if (file) {
+      applyPhoto(file);
+    }
+  }
+);
 
 
 // Close modal buttons

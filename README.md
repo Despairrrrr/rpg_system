@@ -22,7 +22,9 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 
 The top navigation contains **Goals** and **Statistics**, without a Skills tab or inactive
 notification/settings icons. Skills remain in the dashboard sidebar. Goals use the same
-**… → Edit / Delete** menu both on the dashboard and on the Skill detail page.
+**… → Edit / Delete** menu both on the dashboard and on the Skill detail page. The avatar
+in the profile card is an upload control: it shows a **+** inside the ring until a photo is
+set, and opens the same shared **…** menu with **Load a photo / Delete photo**.
 
 The Statistics Life Areas dialog assigns existing Skills and intentionally has no
 **+ Create a Skill** button. Create Skills through **+ Add skill** in the dashboard panel.
@@ -175,6 +177,11 @@ already exists locally. Schema migration and automatic daily resets preserve the
 timestamp, and uploads wait for the sign-in comparison. Without a connection the app keeps
 working locally and retries on the next save or when the browser comes online. Whole-document
 sync does not merge simultaneous edits from different devices.
+
+The profile photo is part of that state, so it syncs the same way and needs no separate
+upload. It is stored as a small data URL (centre-cropped 256x256 JPEG, capped at roughly
+150 KB) because Firestore caps a document at 1 MiB and the whole state goes up as a single
+JSON string. Clearing it is **Delete photo** in the avatar menu.
 
 ### Publish on GitHub Pages
 

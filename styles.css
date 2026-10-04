@@ -663,34 +663,45 @@ button { cursor: pointer; }
   gap: 22px;
 }
 
+/* A real upload control: an empty plus in the ring, or the photo. */
 .avatar {
   width: 96px;
   height: 96px;
+  padding: 0;
   border-radius: 50%;
   border: 2px solid var(--orange);
   box-shadow: 0 0 20px rgba(255, 174, 22, 0.18);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   position: relative;
+  cursor: pointer;
+  color: var(--blue);
+  background: rgba(7, 27, 44, 0.72);
 }
 
-.avatar-head {
-  width: 24px;
-  height: 24px;
-  border: 3px solid #3777a5;
-  border-radius: 50%;
-  position: absolute;
-  left: 34px;
-  top: 24px;
+.avatar:hover {
+  border-color: #ff8a3d;
+  box-shadow: 0 0 26px rgba(255, 174, 22, 0.32);
 }
 
-.avatar-body {
-  width: 50px;
-  height: 28px;
-  border: 3px solid #3777a5;
-  border-bottom: 0;
-  border-radius: 30px 30px 0 0;
-  position: absolute;
-  left: 21px;
-  bottom: 21px;
+.avatar:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.avatar-plus {
+  font-size: 34px;
+  font-weight: 300;
+  line-height: 1;
+  text-indent: 2px;
+}
+
+.avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-topline h2 {
@@ -1413,14 +1424,8 @@ button { cursor: pointer; }
     height: 72px;
   }
 
-  .avatar-head {
-    left: 24px;
-    top: 16px;
-  }
-
-  .avatar-body {
-    left: 10px;
-    bottom: 12px;
+  .avatar-plus {
+    font-size: 26px;
   }
 
   .streak-badge {

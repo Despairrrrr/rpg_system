@@ -10,6 +10,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 |---|---|---|
 | Top navigation | **Goals** and **Statistics** only; no Skills tab | `index.html`, navigation handler in `app.js` |
 | Header actions | Search and sign-in; no inactive notification/settings buttons | `index.html` |
+| Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
 | Dashboard Goals | One **…** menu containing Edit and Delete | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
 | Goals inside a Skill | The same **…** menu; no permanent Edit/Delete buttons | `renderGoalTreeNode()`, `createGoalActionsMenu()` |
 | Skill rows | Aligned progress list with **… → Edit / Delete** and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
@@ -20,6 +21,10 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 
 The shared Goal menu uses `GOAL_MENU_ITEMS`, calls `openGoalModal()` and `deleteGoal()`,
 and retains delete confirmation, keyboard navigation, Escape and outside-click dismissal.
+The profile photo reuses that same shared menu through `PHOTO_MENU_ITEMS`, so the avatar
+inherits its positioning and keyboard behavior instead of growing a second menu. Because
+the element is shared, `openGoalMenu()` repaints item labels, modifiers and `disabled`
+per open; a descriptor may compute `disabled` as a function.
 The dashboard and Skill page render Goals separately, so changes to Goal actions must
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
@@ -50,7 +55,8 @@ The application keeps one `state` object:
 ```js
 {
   profile: {
-    name: "User User"
+    name: "User User",
+    photo: ""             // optional data URL; "" or absent means the empty plus
   },
   goals: [],
   skills: [],
@@ -61,6 +67,13 @@ The application keeps one `state` object:
   schemaVersion: 3
 }
 ```
+
+`profile.photo` is a centre-cropped 256x256 JPEG data URL (quality 0.82).
+It is capped at roughly 150 KB and re-encoded smaller once if it does not
+fit, because the cloud upload sends the whole state as a single JSON string
+and Firestore rejects documents over 1 MiB. Existing documents have no `photo`
+field at all, which is why every read goes through `readProfilePhoto()`
+instead of trusting the field to exist or to hold a data URL.
 
 A goal looks like this:
 

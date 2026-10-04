@@ -20,6 +20,10 @@ them; update the documentation alongside that change.
 - The Statistics **Life Areas** dialog has no **+ Create a Skill** button. It assigns
   existing Skills. Skill creation remains in the dashboard's Skills panel. Do not
   restore `createStatisticsSkill` or the removed `addSkill` view callback.
+- The profile-card avatar is a real upload control, not a decorative placeholder. It shows
+  a **+** inside the ring until a photo is set and opens the shared actions menu with
+  **Load a photo** and **Delete photo**; Delete stays disabled while there is no photo. Do
+  not restore the old `.avatar-head`/`.avatar-body` CSS silhouette.
 - Statistics contains exactly Weekly Activity, Top Skill Progression and Life Areas,
   sharing one Monday–Sunday week selection with future weeks disabled. Do not add
   other analytics modules as part of an unrelated feature.
@@ -44,6 +48,10 @@ them; update the documentation alongside that change.
   counts in Skill statistics, but never in Life Area percentages or an "Other" Area.
 - Historical Life Area calculations use current Skill assignments. Weekly
   aggregates are calculated from facts, not stored as independent totals.
+- `profile.photo` is a centre-cropped 256x256 JPEG data URL that travels with the ordinary
+  state write; do not add a second upload path or a Firebase Storage dependency. Keep the
+  size cap (Firestore rejects documents over 1 MiB) and read it through `readProfilePhoto()`
+  so documents without the field still work. Never put the data URL into `innerHTML`.
 
 ## Implementation and verification
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=15" />
 </head>
 <body>
   <header class="topbar">
@@ -65,10 +65,18 @@
 
     <aside class="sidebar">
       <section class="profile-card panel">
-        <div class="avatar" aria-hidden="true">
-          <div class="avatar-head"></div>
-          <div class="avatar-body"></div>
-        </div>
+        <button
+          type="button"
+          class="avatar"
+          id="profileAvatar"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-label="Profile photo"
+          title="Profile photo"
+        >
+          <span class="avatar-plus" aria-hidden="true">+</span>
+        </button>
+        <input type="file" id="profilePhotoInput" accept="image/*" hidden />
 
         <div class="profile-content">
           <div class="profile-topline">
@@ -332,6 +340,6 @@
   <script src="firebase.init.js?v=2"></script>
   <script src="statistics-model.js?v=1"></script>
   <script src="statistics.js?v=5"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
