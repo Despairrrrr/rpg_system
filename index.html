@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body>
   <header class="topbar">
@@ -22,6 +22,18 @@
         <span class="search-icon">⌕</span>
         <input id="searchInput" type="search" placeholder="Find a goal or skill..." />
       </label>
+      <div class="reminder-control">
+        <button type="button" class="reminder-bell" id="reminderBell" aria-label="Reminders, 0 pending" aria-expanded="false" aria-controls="reminderPanel" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
+          <span id="reminderCount" class="reminder-count" hidden>0</span>
+        </button>
+        <section class="reminder-panel" id="reminderPanel" role="dialog" aria-labelledby="reminderHeading" hidden>
+          <div class="reminder-panel-head"><h2 id="reminderHeading">Reminders</h2><button type="button" class="close-btn" id="reminderClose" aria-label="Close reminders">×</button></div>
+          <p class="field-hint" id="reminderEmpty">No pending reminders.</p>
+          <ul id="reminderList"></ul>
+          <p class="field-hint">Reminders work while the app is open. Times use your current timezone.</p>
+        </section>
+      </div>
       <a class="auth-btn" id="authBtn" href="login.html" title="Sign in to sync progress">Sign in</a>
     </div>
   </header>
@@ -200,10 +212,56 @@
         <p class="type-hint" id="goalTypeHint" data-type="step">Concrete action</p>
       </label>
 
-      <label class="goal-repeat" id="goalRepeatField">
-        <input type="checkbox" id="goalRepeat" />
-        <span>Repeat daily</span>
-      </label>
+      <fieldset class="goal-schedule" id="goalRepeatField">
+        <legend>Schedule</legend>
+        <div class="schedule-mode">
+          <label><input type="radio" name="scheduleMode" id="goalOneTime" value="one-time" checked /> One-time</label>
+          <label><input type="radio" name="scheduleMode" id="goalRepeat" value="repeating" /> Repeating</label>
+        </div>
+        <div id="goalScheduleFields" hidden>
+          <label>Frequency
+            <select id="goalFrequency">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="custom">Custom days</option>
+            </select>
+          </label>
+          <div id="goalDaysField" hidden>
+            <span id="goalDaysLabel">Days</span>
+            <div class="schedule-days" role="group" aria-labelledby="goalDaysLabel">
+              <button type="button" data-schedule-day="1" aria-pressed="false">Mon</button>
+              <button type="button" data-schedule-day="2" aria-pressed="false">Tue</button>
+              <button type="button" data-schedule-day="3" aria-pressed="false">Wed</button>
+              <button type="button" data-schedule-day="4" aria-pressed="false">Thu</button>
+              <button type="button" data-schedule-day="5" aria-pressed="false">Fri</button>
+              <button type="button" data-schedule-day="6" aria-pressed="false">Sat</button>
+              <button type="button" data-schedule-day="7" aria-pressed="false">Sun</button>
+            </div>
+            <p class="field-error" id="goalDaysError" role="status" hidden></p>
+          </div>
+          <label>Time (optional)
+            <span class="goal-time-control" id="goalTimeControl" data-empty="true"><input type="time" id="goalTime" lang="en-GB" step="60" aria-describedby="goalTimeHint goalTimeError" /><span class="goal-time-placeholder" aria-hidden="true">Any time</span></span>
+            <span class="field-hint" id="goalTimeHint">Optional · HH:MM, local time</span>
+            <span class="field-error" id="goalTimeError" role="status" hidden></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="goal-schedule">
+        <legend>Reminder</legend>
+        <label class="schedule-check"><input type="checkbox" id="goalReminder" disabled /> Send notification</label>
+        <p class="field-hint" id="goalReminderHint">Choose a repeating schedule and time to enable reminders.</p>
+        <label id="goalReminderOffsetField" hidden>Notify me
+          <select id="goalReminderOffset">
+            <option value="0m">At time</option>
+            <option value="5m" selected>5 minutes before</option>
+            <option value="15m">15 minutes before</option>
+            <option value="30m">30 minutes before</option>
+          </select>
+        </label>
+        <p class="field-hint" id="goalNotificationInfo" hidden>Browser notifications are disabled. Enable them in your browser settings to receive reminders.</p>
+      </fieldset>
+      <p class="field-error" id="goalFormError" role="alert" hidden></p>
 
       <label>
         Skill
@@ -231,7 +289,7 @@
 
       <div class="modal-actions">
         <button type="button" class="secondary-btn" data-close="goalModal">Cancel</button>
-        <button class="primary-btn" type="submit">Save goal</button>
+        <button class="primary-btn" id="goalSave" type="submit">Save goal</button>
       </div>
     </form>
   </dialog>
@@ -340,6 +398,8 @@
   <script src="firebase.init.js?v=2"></script>
   <script src="statistics-model.js?v=1"></script>
   <script src="statistics.js?v=5"></script>
-  <script src="app.js?v=13"></script>
+  <script src="schedule-model.js?v=1"></script>
+  <script src="reminders.js?v=1"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

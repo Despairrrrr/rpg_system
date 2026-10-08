@@ -14,6 +14,7 @@ async function run() {
   let currentUser = { uid: 'u' }, cloudReady = false, syncTimer = null, cloudPull = null, queued;
   let cloud = { updatedAt: 20, state: JSON.stringify({ skills: [{ id: 's', name: 'Math', xp: 200 }], goals: [] }) };
   let writes = [];
+  const document = { getElementById: () => null };
   const localStorage = { setItem: (_, value) => { localStorage.saved = value; } };
   const setTimeout = callback => { queued = callback; return 1; };
   const clearTimeout = () => {};
@@ -31,11 +32,14 @@ async function run() {
   assert(state.skills[0].xp === 200 && state.updatedAt === 20, 'newer cloud survives startup maintenance');
   assert(state.completionHistory.length === 0 && state.lifeAreas.length === 0, 'cloud legacy schema migrated');
   assert(JSON.parse(localStorage.saved).updatedAt === 20, 'cloud timestamp is preserved locally');
+  state.goals.push({ id: 'scheduled', type: 'step', repeatsDaily: false, skillId: 's', title: 'Weekly', schedule: { type: 'weekly', time: '07:00', daysOfWeek: [1,3,5] }, reminder: { enabled: true, offset: '15m' } });
+  state.reminderReceipts = { scheduled: { key: 'occurrence', status: 'skipped' } };
   state.completionHistory.push({ id: 'r', goalId: 'g', skillId: 's', completionDate: Statistics.dayKey(), xpAwarded: 10 });
   Statistics.createArea(state, 'a', 'Learning', ['s']);
   api.saveState();
   await api.pushToCloud();
   const sent = JSON.parse(writes[writes.length - 1].state);
+  assert(sent.goals[0].schedule.time === '07:00' && sent.goals[0].reminder.offset === '15m' && sent.reminderReceipts.scheduled.status === 'skipped', 'schedule, reminder and receipt cloud round-trip');
   assert(sent.completionHistory.length === 1 && sent.lifeAreas.length === 1 && sent.skills[0].lifeAreaId === 'a', 'cloud round-trip includes facts and relationships');
   assert(writes[writes.length - 1].updatedAt === state.updatedAt, 'cloud envelope uses actual edit timestamp');
   writes = [];

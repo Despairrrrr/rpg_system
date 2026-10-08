@@ -14,11 +14,31 @@ import threading
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 seed = {"updatedAt": 17, "skills": [{"id": "math", "name": "Math", "goal": "", "xp": 100}], "goals": []}
-html = (ROOT / 'index.html').read_text()
+page = os.environ.get('GOAL_TEST_PAGE', 'index.html')
+html = (ROOT / page).read_text()
 html = re.sub(r'<script src="https:[^"]+"></script>', '', html)
 html = re.sub(r'<link[^>]+https:[^>]+>', '', html)
 html = re.sub(r'<script src="firebase.init.js[^"]*"></script>', '', html)
 html = html.replace('<script src="statistics-model.js', '<script>localStorage.setItem("neonGoalTracker.v1", ' + json.dumps(json.dumps(seed)) + ');</script><script src="statistics-model.js')
+instrumentation = """<script>
+window.__browserErrors = [];
+window.addEventListener('error', event => window.__browserErrors.push(event.message));
+window.addEventListener('unhandledrejection', event => window.__browserErrors.push(String(event.reason)));
+const originalError = console.error;
+console.error = (...args) => { window.__browserErrors.push(args.join(' ')); originalError.apply(console, args); };
+const originalWarn = console.warn;
+console.warn = (...args) => { window.__browserErrors.push(args.join(' ')); originalWarn.apply(console, args); };
+window.__notifications = [];
+window.Notification = class {
+  static permission = 'denied';
+  static requests = 0;
+  static result = 'granted';
+  static requestPermission() { this.requests++; this.permission = this.result; return Promise.resolve(this.result); }
+  constructor(title, options) { this.title = title; this.options = options; window.__notifications.push(this); }
+  close() { this.closed = true; }
+};
+</script>"""
+html = html.replace('<script src="statistics-model.js', instrumentation + '<script src="statistics-model.js')
 test_script = os.environ.get('STATISTICS_TEST_SCRIPT', 'statistics-browser.js')
 html = html.replace('</body>', f'<script src="tests/{test_script}"></script></body>')
 
@@ -26,8 +46,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
+    def end_headers(self):
+        # Defense in depth: even a mistaken fixture navigation cannot contact cloud services.
+        self.send_header('Content-Security-Policy', "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:")
+        super().end_headers()
+
     def do_GET(self):
-        if self.path == '/statistics-test':
+        if self.path.split('?')[0] == '/statistics-test':
             body = html.encode()
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -72,13 +97,13 @@ if sys.argv[1] == 'webkit':
             print(value)
             surface = window.get_surface()
             if surface:
-                surface.write_to_png('/tmp/statistics-' + width + '.png')
+                surface.write_to_png(os.environ.get('BROWSER_SCREENSHOT', '/tmp/statistics-' + width + '.png'))
         except Exception as error:
             print(error)
         Gtk.main_quit()
 
     def check_result():
-        script = "document.getElementById('test-result')?.textContent || ''"
+        script = "window.__browserErrors?.length ? 'FAIL: browser console: ' + window.__browserErrors.join('; ') : document.getElementById('test-result')?.textContent || ''"
         view.evaluate_javascript(script, -1, None, None, None, result_ready, None)
         return False
 
@@ -87,7 +112,7 @@ if sys.argv[1] == 'webkit':
             GLib.timeout_add(700, check_result)
 
     view.connect('load-changed', loaded)
-    view.load_uri(f'http://127.0.0.1:{server.server_port}/statistics-test')
+    view.load_uri(f'http://127.0.0.1:{server.server_port}/statistics-test?id=math')
     GLib.timeout_add_seconds(30, lambda: Gtk.main_quit())
     Gtk.main()
     server.shutdown()
@@ -99,7 +124,7 @@ with tempfile.TemporaryDirectory(prefix='statistics-browser-') as profile:
         '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--no-proxy-server', '--disable-dev-shm-usage',
         '--user-data-dir=' + profile, '--window-size=' + width + ',' + height,
         '--virtual-time-budget=15000', '--dump-dom', '--screenshot=/tmp/statistics-' + width + '.png',
-        f'http://127.0.0.1:{server.server_port}/statistics-test',
+        f'http://127.0.0.1:{server.server_port}/statistics-test?id=math',
     ], capture_output=True, text=True, timeout=45)
     match = re.search(r'<pre id="test-result"[^>]*>(.*?)</pre>', result.stdout, re.S)
     if not match:

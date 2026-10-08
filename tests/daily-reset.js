@@ -2,6 +2,9 @@
 const source = typeof require === 'function'
   ? require('fs').readFileSync('app.js', 'utf8')
   : new TextDecoder().decode(imports.gi.GLib.file_get_contents('app.js')[1]);
+const scheduleSource = typeof require === 'function'
+  ? require('fs').readFileSync('schedule-model.js', 'utf8')
+  : new TextDecoder().decode(imports.gi.GLib.file_get_contents('schedule-model.js')[1]);
 function assert(ok, message) { if (!ok) throw new Error(message); }
 function section(start, end) {
   return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
@@ -12,6 +15,8 @@ class FakeDate extends NativeDate {
   constructor(...args) { super(...(args.length ? args : [clock])); }
 }
 function run(Date) {
+  const structuredClone = value => JSON.parse(JSON.stringify(value));
+  const GoalSchedule = eval(scheduleSource + "\nGoalSchedule;");
   let state = {
     goals: [
       { id: 'daily', repeatsDaily: true, completed: true, completedDay: '2026-10-04', skillId: 's', xp: 10 },
@@ -70,6 +75,9 @@ function run(Date) {
   state.goals[0].completedDay = '';
   render();
   assert(!state.goals[0].completed && state.skills[0].xp === 110, 'legacy undated completion resets on render without losing XP');
+  state.goals.push({ id: 'weekly', type: 'step', completed: true, completedDay: '2026-10-05', activeCompletionId: 'old', schedule: { type: 'weekly', daysOfWeek: [1,3,5] } });
+  api.resetRepeatingGoals();
+  assert(!state.goals[3].completed && !state.goals[3].activeCompletionId && state.skills[0].xp === 110, 'weekly after suspension resets linkage without XP loss');
 }
 run(FakeDate);
 (typeof print === 'function' ? print : console.log)('PASS: local midnight, manual XP reversal, daily reset, ordinary goals, repeat rewards, suspended tab, legacy completion');

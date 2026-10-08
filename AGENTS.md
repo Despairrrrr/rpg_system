@@ -10,8 +10,9 @@ them; update the documentation alongside that change.
 - `index.html` top navigation contains **Goals** and **Statistics** only. Do not
   restore a **Skills** navigation tab. Skills remain in the dashboard sidebar;
   clicking a Skill opens `skill.html?id=...`.
-- Do not restore the notification or settings icon buttons. They were deliberately
-  removed because they had no behavior. Do not add inactive placeholder controls.
+- The notification bell is a working reminder panel on both Goal pages. Preserve its
+  pending count, Mark done/Skip actions and keyboard dismissal. Do not add inactive
+  settings buttons or other placeholder controls.
 - Every Goal, both on the dashboard and in the Skill detail tree, has one **…**
   actions trigger. Its menu contains **Edit** and **Delete**. Reuse
   `createGoalActionsMenu()` and `GOAL_MENU_ITEMS` in `app.js`; do not replace the tree
@@ -36,10 +37,14 @@ them; update the documentation alongside that change.
 ## Preserve data behavior
 
 - Every Goal must reference an existing Skill. Step/Quest/Arc are roles, while
-  `repeatsDaily` is independent and allowed only for Step and Quest.
-- Manual undo reverses the recorded reward and Skill. Automatic local-day reset
-  clears only repeating Goals' checked state and active completion link, preserving
-  XP and completion history. Ordinary Goals do not reset daily.
+  recurrence is independent and allowed only for Step and Quest. Optional `schedule`
+  supports daily/weekly/custom days; retain `repeatsDaily` as the daily compatibility
+  flag. Arcs remain non-repeating.
+- Manual undo reverses the recorded reward and Skill. Daily Goals reset at the next
+  local day; weekly/custom Goals reset on their next selected day. Reset clears only
+  checked state and active completion linkage, preserving XP/history. One-time Goals
+  never reset. Reminder completion records the actual completion day; completing an
+  early reminder for tomorrow must survive tonight's midnight reset.
 - Preserve stored Goals, Skills, XP, completion history and Life Areas. Keep the
   `neonGoalTracker.v1` storage key and migrate existing data; never reset it to make
   a new feature work. Do not invent pre-tracking historical XP.
@@ -57,7 +62,9 @@ them; update the documentation alongside that change.
 
 - This is a vanilla HTML/CSS/JS frontend. `app.js` owns application state and CRUD;
   `statistics-model.js` owns date/aggregation/Area logic; `statistics.js` owns the
-  Statistics UI. Both `index.html` and `skill.html` load the shared scripts.
+  Statistics UI. `schedule-model.js` owns local schedule validation/calculations;
+  `reminders.js` owns the reminder panel, timer and optional browser notifications.
+  Both `index.html` and `skill.html` load the shared scripts.
 - Inspect the current working tree before editing. Older commits, screenshots and
   illustrative documentation snippets may predate accepted changes. Do not rebuild
   entire files from an old version or discard unrelated uncommitted changes.
@@ -74,3 +81,20 @@ them; update the documentation alongside that change.
   Step/Quest/Arc differ subtly in padding and title size. Completed cards are quieter
   without dimming active child Goals. XP is secondary and Skill/parent metadata uses
   compact wrapping tags. Skills use two aligned progress columns on wide screens and one on screens up to 720px.
+
+## Schedule and reminder contract
+
+- One-time is the form default. Weekly/custom require at least one weekday (1=Mon,
+  7=Sun). Time is an optional local `HH:MM` string; untimed schedules show Any time.
+  Reminders require a repeating schedule with a valid time. Removing the schedule
+  clears reminder settings. Cancel never writes draft values.
+- Migrate legacy `repeatsDaily: true` Goals with no schedule to `{ type: "daily" }`
+  and `{ enabled: false, offset: "0m" }`, after legacy type migration. Preserve all
+  facts and edit timestamps. Invalid optional scheduling data uses legacy behavior.
+- Keep only the latest due reminder per Goal, including Missed occurrences. Skip
+  dismisses one occurrence without XP. Mark done reuses normal completion and undo.
+  Occurrence receipts are optional state data; browser delivery receipts are a small
+  device-local cache. Do not manufacture completion history for missed occurrences.
+- Check while open every 60 seconds and on resume; no service workers or push.
+  Browser permission is requested only when the user enables Send notification.
+  Denial, unavailable APIs and notification failures must leave in-app reminders usable.

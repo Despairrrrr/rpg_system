@@ -127,7 +127,8 @@ function getGoalTypeMeta(type) {
 }
 
 function isRepeatingGoal(goal) {
-  return Boolean(goal?.repeatsDaily);
+  const schedule = typeof GoalSchedule !== 'undefined' ? GoalSchedule.effective(goal) : null;
+  return schedule ? schedule.type !== 'one-time' : Boolean(goal?.repeatsDaily);
 }
 
 // Only Step and Quest repeat. An Arc is a direction, not an action to
@@ -276,9 +277,16 @@ function migrateGoalType(goal) {
 // carried over untouched; parents are resolved afterwards, once every
 // goal already has its new type, so links that are still legal survive
 // and the rest are cleared instead of deleting anything.
+function migrateGoalSchedule(goal) {
+  if (goal.repeatsDaily === true && !goal.schedule) {
+    return { ...goal, schedule: { type: 'daily' }, reminder: { enabled: false, offset: '0m' } };
+  }
+  return goal;
+}
+
 function migrateGoals(goals) {
   const migrated = goals.map(
-    (goal) => ({
+    (goal) => migrateGoalSchedule({
       ...goal,
       ...migrateGoalType(goal),
     })
@@ -305,6 +313,9 @@ function migrateState(loaded) {
 
 
 let state = loadState();
+let reminderPanel = null;
+let reminderSystem = null;
+let browserReminders = null;
 
 const isSkillPage =
   document.body.dataset.page ===
@@ -437,14 +448,23 @@ function loadState() {
 
 
 function saveState({ maintenance = false } = {}) {
-  if (!maintenance) state.updatedAt = Date.now();
+  if (!maintenance) state.updatedAt = Math.max(Date.now(), (Number(state.updatedAt) || 0) + 1);
 
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(state)
-  );
-
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (_) {
+    let notice = document.getElementById('storageError');
+    if (!notice) {
+      notice = document.createElement('p');
+      notice.id = 'storageError'; notice.className = 'storage-error'; notice.setAttribute('role', 'alert');
+      document.body.prepend(notice);
+    }
+    notice.textContent = 'Could not save changes. Browser storage may be full or unavailable. Keep this tab open and free some storage before trying again.';
+    return false;
+  }
+  document.getElementById('storageError')?.remove();
   queueCloudSync();
+  return true;
 }
 
 
@@ -473,6 +493,7 @@ function render() {
   } else {
     renderGoals();
   }
+  reminderSystem?.refresh();
 }
 
 
@@ -507,13 +528,14 @@ function resetRepeatingGoals() {
 
   for (const goal of state.goals) {
     if (
-      isRepeatingGoal(goal) &&
-      goal.completed &&
-      goal.completedDay !== today
+      (typeof GoalSchedule !== 'undefined'
+        ? GoalSchedule.shouldReset(goal)
+        : isRepeatingGoal(goal) && goal.completed && goal.completedDay !== today)
     ) {
       goal.completed = false;
       goal.completedDay = "";
       goal.activeCompletionId = "";
+      delete goal.completedScheduleDay;
       changed = true;
     }
   }
@@ -2034,8 +2056,8 @@ function renderGoalRepeat(
     return;
   }
 
-  badge.hidden =
-    !isRepeatingGoal(goal);
+  badge.textContent = GoalSchedule.label(goal);
+  badge.hidden = !badge.textContent;
 }
 
 function renderGoalState(
@@ -2721,9 +2743,31 @@ function renderGoalTreeNode(
 // =================================
 
 
+function reportGoalError(message) {
+  const error = document.getElementById('goalFormError');
+  error.textContent = message;
+  error.hidden = false;
+}
+
+function validateGoalWrite(data) {
+  const title = typeof data.title === 'string' ? data.title.trim() : '';
+  const description = typeof data.description === 'string' ? data.description.trim() : '';
+  if (!title || title.length > 80) throw new Error('Enter a title (up to 80 characters).');
+  if (description.length > 160) throw new Error('Description must be 160 characters or fewer.');
+  if (!state.skills.some(skill => skill.id === data.skillId)) throw new Error('Select an existing Skill.');
+  if (!goalTypes.includes(data.type)) throw new Error('Choose a valid Goal type.');
+  const xp = Number(data.xp);
+  if (!Number.isFinite(xp) || xp < 0 || !Number.isInteger(xp)) throw new Error('Enter a valid XP reward.');
+  const optional = Object.prototype.hasOwnProperty.call(data, 'schedule')
+    ? GoalSchedule.validate(data.schedule, data.reminder, data.type) : {};
+  return { ...data, ...buildGoalPatch(data, state.goals), title, description, xp, ...optional };
+}
+
 // CREATE
 function createGoal(data) {
-  if (!state.skills.some(skill => skill.id === data.skillId)) return;
+  try { data = validateGoalWrite(data); }
+  catch (error) { reportGoalError(error.message); return false; }
+  const previous = structuredClone(state);
   const newGoal = {
     id: crypto.randomUUID(),
 
@@ -2737,6 +2781,10 @@ function createGoal(data) {
     // may set it; an Arc is always false.
     repeatsDaily:
       data.repeatsDaily,
+
+    // Optional fields travel in the ordinary state document.
+    ...(data.schedule !== undefined ? { schedule: structuredClone(data.schedule) } : {}),
+    ...(data.reminder !== undefined ? { reminder: structuredClone(data.reminder) } : {}),
 
     skillId:
       data.skillId,
@@ -2767,9 +2815,10 @@ function createGoal(data) {
 
   syncGoalParents();
 
-  saveState();
+  if (!saveState()) { state = previous; reportGoalError("Could not save this Goal. Please try again."); return false; }
 
   render();
+  return true;
 }
 
 
@@ -2794,7 +2843,8 @@ function syncGoalParents() {
 function toggleGoalCompletion(
   goalId,
   completed,
-  anchorEl = null
+  anchorEl = null,
+  occurrence = null
 ) {
   // A click may arrive before the midnight timer after a suspended tab wakes.
   if (resetRepeatingGoals()) render();
@@ -2816,6 +2866,7 @@ function toggleGoalCompletion(
     return;
   }
 
+  const previousState = structuredClone(state);
   const previousRecord = state.completionHistory.find(record => record.id === goal.activeCompletionId);
   const rewardSkillId = !completed && previousRecord ? previousRecord.skillId : goal.skillId;
   const skill =
@@ -2927,23 +2978,28 @@ function toggleGoalCompletion(
     const record = {
       id: crypto.randomUUID(), goalId: goal.id, skillId: skill.id,
       completionDate: getDayKey(), xpAwarded: nextSkillXp - prevSkillXp,
+      ...(occurrence ? { occurrenceKey: occurrence.key } : {}),
     };
+    if (occurrence) goal.completedScheduleDay = occurrence.day;
     state.completionHistory.push(record);
     goal.activeCompletionId = record.id;
   } else {
     state.completionHistory = state.completionHistory.filter(record => record.id !== goal.activeCompletionId);
     goal.activeCompletionId = "";
+    delete goal.completedScheduleDay;
+    if (state.reminderReceipts?.[goal.id]?.status === 'done') delete state.reminderReceipts[goal.id];
   }
   goal.completed = completed;
 
   goal.completedDay =
     completed ? getDayKey() : "";
 
-  saveState();
+  if (saveState() === false) { state = previousState; render(); return false; }
 
   render();
 
   runCompletionFeedback(fx, events);
+  return true;
 }
 
 
@@ -2962,18 +3018,23 @@ function updateGoal(
     return;
   }
 
-  if (patch.skillId !== undefined && !state.skills.some(skill => skill.id === patch.skillId)) return;
+  try { patch = validateGoalWrite({ ...goal, ...patch }); }
+  catch (error) { reportGoalError(error.message); return false; }
 
-  Object.assign(
-    goal,
-    patch
-  );
+  const previous = structuredClone(state);
+  const scheduleChanged = JSON.stringify(goal.schedule) !== JSON.stringify(patch.schedule);
+  Object.assign(goal, patch);
+  if (scheduleChanged) {
+    if (state.reminderReceipts) delete state.reminderReceipts[id];
+    delete goal.completedScheduleDay;
+  }
 
   syncGoalParents();
 
-  saveState();
+  if (!saveState()) { state = previous; reportGoalError("Could not save this Goal. Please try again."); return false; }
 
   render();
+  return true;
 }
 
 
@@ -2998,6 +3059,7 @@ function deleteGoal(id) {
     return;
   }
 
+  if (state.reminderReceipts) delete state.reminderReceipts[id];
   state.goals =
     state.goals.filter(
       (item) =>
@@ -3192,7 +3254,10 @@ function syncGoalTypeUI() {
 
   if (!repeatable) {
     els.goalRepeat.checked = false;
+    document.getElementById("goalOneTime").checked = true;
   }
+
+  syncGoalScheduleUI();
 
   const canNest =
     (goalParentTypes[els.goalType.value] || [])
@@ -3206,6 +3271,52 @@ function syncGoalTypeUI() {
   }
 }
 
+
+function syncGoalScheduleUI() {
+  const $ = id => document.getElementById(id);
+  const repeating = els.goalRepeat.checked && !els.goalRepeat.disabled;
+  $('goalScheduleFields').hidden = !repeating;
+  $('goalDaysField').hidden = !repeating || $('goalFrequency').value === 'daily';
+  $('goalTimeControl').dataset.empty = String(!$('goalTime').value);
+  const canRemind = repeating && Boolean($('goalTime').value);
+  $('goalReminder').disabled = !canRemind;
+  if (!canRemind) $('goalReminder').checked = false;
+  $('goalReminderHint').hidden = canRemind;
+  $('goalReminderOffsetField').hidden = !$('goalReminder').checked;
+  $('goalNotificationInfo').hidden = !$('goalReminder').checked ||
+    browserReminders?.permission() === 'granted';
+  validateGoalForm();
+}
+
+function readGoalScheduleForm() {
+  const $ = id => document.getElementById(id);
+  return {
+    schedule: els.goalRepeat.checked && !els.goalRepeat.disabled ? {
+      type: $('goalFrequency').value,
+      time: $('goalTime').value,
+      daysOfWeek: [...document.querySelectorAll('[data-schedule-day][aria-pressed="true"]')].map(button => Number(button.dataset.scheduleDay)),
+    } : { type: 'one-time' },
+    reminder: { enabled: $('goalReminder').checked, offset: $('goalReminderOffset').value },
+  };
+}
+
+function validateGoalForm() {
+  const $ = id => document.getElementById(id);
+  const draft = readGoalScheduleForm();
+  const repeating = draft.schedule.type !== 'one-time';
+  const daysError = repeating && draft.schedule.type !== 'daily' && !draft.schedule.daysOfWeek.length;
+  const timeError = repeating && ($('goalTime').validity.badInput ||
+    ($('goalTime').value && !GoalSchedule.validTime($('goalTime').value)));
+  $('goalDaysError').textContent = daysError ? 'Select at least one day' : '';
+  $('goalDaysError').hidden = !daysError;
+  $('goalTimeError').textContent = timeError ? 'Please enter a valid time (HH:MM)' : '';
+  $('goalTimeError').hidden = !timeError;
+  $('goalTime').setAttribute('aria-invalid', String(Boolean(timeError)));
+  $('goalTime').setCustomValidity(timeError ? 'Please enter a valid time (HH:MM)' : '');
+  $('goalTime').disabled = !repeating;
+  $('goalSave').disabled = Boolean(daysError || timeError || !els.goalTitle.value.trim() || !els.goalSkill.value);
+  return !$('goalSave').disabled;
+}
 
 function openGoalModal(
   goal = null,
@@ -3281,6 +3392,21 @@ function openGoalModal(
       "";
   }
 
+  const schedule = GoalSchedule.read(goal);
+  document.getElementById('goalOneTime').checked = !els.goalRepeat.checked;
+  if (schedule) {
+    els.goalRepeat.checked = schedule.type !== 'one-time';
+    document.getElementById('goalOneTime').checked = !els.goalRepeat.checked;
+  }
+  document.getElementById('goalFrequency').value = schedule?.type !== 'one-time' && schedule ? schedule.type : 'daily';
+  document.getElementById('goalTime').value = schedule?.time || '';
+  document.querySelectorAll('[data-schedule-day]').forEach(button => {
+    button.setAttribute('aria-pressed', String(Boolean(schedule?.daysOfWeek?.includes(Number(button.dataset.scheduleDay)))));
+  });
+  const reminder = GoalSchedule.reminder(goal);
+  document.getElementById('goalReminder').checked = reminder.enabled;
+  document.getElementById('goalReminderOffset').value = reminder.offset;
+  document.getElementById('goalFormError').hidden = true;
   syncGoalTypeUI();
 
   els.goalModal.showModal();
@@ -3579,15 +3705,34 @@ els.goalSkill.addEventListener(
   }
 );
 
+document.getElementById('goalReminder').addEventListener('change', () => {
+  if (document.getElementById('goalReminder').checked) {
+    browserReminders?.requestPermission().then(() => {
+      syncGoalScheduleUI();
+      reminderSystem?.refresh();
+    });
+  }
+});
+els.goalForm.addEventListener('change', syncGoalScheduleUI);
+els.goalForm.addEventListener('input', syncGoalScheduleUI);
+document.querySelectorAll('[data-schedule-day]').forEach(button => {
+  button.addEventListener('click', () => {
+    button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
+    syncGoalScheduleUI();
+  });
+});
+
 els.goalForm.addEventListener(
   "submit",
   (event) => {
     event.preventDefault();
+    if (!validateGoalForm()) return;
 
     // buildGoalPatch settles everything that depends on the type, so an
     // Arc can never be saved as repeating and a Step can never be saved
     // under a Step.
     const payload = {
+      ...readGoalScheduleForm(),
       ...buildGoalPatch(
         {
           id: els.goalId.value,
@@ -3621,20 +3766,10 @@ els.goalForm.addEventListener(
       return;
     }
 
-    if (
-      els.goalId.value
-    ) {
-      updateGoal(
-        els.goalId.value,
-        payload
-      );
-    } else {
-      createGoal(
-        payload
-      );
-    }
-
-    els.goalModal.close();
+    const saved = els.goalId.value
+      ? updateGoal(els.goalId.value, payload)
+      : createGoal(payload);
+    if (saved) els.goalModal.close();
   }
 );
 
@@ -3996,6 +4131,34 @@ function initAuth() {
 }
 
 
+function syncStoredProgress() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved && Number(saved.updatedAt) > Number(state.updatedAt)) {
+      state = migrateState(saved);
+      render();
+    }
+  } catch (_) { /* A damaged/unavailable storage read cannot replace live progress. */ }
+}
+
+function navigateToGoal(goal) {
+  if (isSkillPage && goal.skillId !== currentSkillId) {
+    location.href = `skill.html?id=${encodeURIComponent(goal.skillId)}&goal=${encodeURIComponent(goal.id)}`;
+    return;
+  }
+  if (!isSkillPage) {
+    document.querySelector('[data-section="goals"]')?.click();
+    if (els.searchInput) els.searchInput.value = '';
+  }
+  render();
+  const card = document.querySelector(`[data-id="${CSS.escape(goal.id)}"]`);
+  if (card) {
+    card.tabIndex = -1;
+    card.focus({ preventScroll: true });
+    card.scrollIntoView({ block: 'center', behavior: 'auto' });
+  }
+}
+
 // ===============================
 // INITIAL RENDER
 // ===============================
@@ -4003,6 +4166,22 @@ function initAuth() {
 const statisticsView = createStatisticsView({
   getState: () => state,
   save: () => { saveState(); render(); },
+});
+
+browserReminders = createBrowserReminders({ getState: () => state, navigate: navigateToGoal });
+
+reminderPanel = createReminderPanel({
+  complete: entry => browserReminders.exclusive(() => reminderSystem?.complete(entry)),
+  skip: entry => browserReminders.exclusive(() => reminderSystem?.skip(entry)),
+  navigate: navigateToGoal,
+});
+
+reminderSystem = createReminderSystem({
+  getState: () => state,
+  save: saveState,
+  complete: entry => toggleGoalCompletion(entry.goal.id, true, null, entry),
+  render: entries => { reminderPanel.render(entries); browserReminders.refresh(entries); },
+  beforeCheck: () => { syncStoredProgress(); refreshLocalDay(); },
 });
 
 initAuth();
@@ -4023,3 +4202,14 @@ window.addEventListener("online", () => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshLocalDay();
 });
+
+const linkedGoal = state.goals.find(goal => goal.id === skillParams.get('goal'));
+if (linkedGoal) navigateToGoal(linkedGoal);
+
+reminderSystem.start();
+window.addEventListener('storage', event => {
+  if (event.key === STORAGE_KEY) { syncStoredProgress(); reminderSystem.refresh(); }
+});
+window.addEventListener('focus', () => reminderSystem.refresh());
+window.addEventListener('pageshow', () => reminderSystem.refresh());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) reminderSystem.refresh(); });

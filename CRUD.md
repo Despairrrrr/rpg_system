@@ -9,7 +9,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Surface | Accepted behavior | Implementation |
 |---|---|---|
 | Top navigation | **Goals** and **Statistics** only; no Skills tab | `index.html`, navigation handler in `app.js` |
-| Header actions | Search and sign-in; no inactive notification/settings buttons | `index.html` |
+| Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
 | Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
 | Dashboard Goals | One **…** menu containing Edit and Delete | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
 | Goals inside a Skill | The same **…** menu; no permanent Edit/Delete buttons | `renderGoalTreeNode()`, `createGoalActionsMenu()` |
@@ -82,7 +82,9 @@ A goal looks like this:
   id: "uuid",
   title: "Read 20 pages",
   type: "step",          // "step" | "quest" | "arc"
-  repeatsDaily: true,    // only "step" and "quest" may set this
+  repeatsDaily: true,    // daily compatibility flag; only Step/Quest
+  schedule: { type: "daily", time: "07:00" }, // optional
+  reminder: { enabled: true, offset: "5m" },  // optional
   skillId: "uuid",
   parentGoalId: "",      // optional; a step may sit under a quest or an arc
   description: "Before bed",
@@ -95,7 +97,8 @@ A goal looks like this:
 ```
 
 The three types describe how big a goal is, not how often it repeats. Recurrence lives in
-`repeatsDaily`, so a daily quest is still a quest:
+`schedule` when present, with `repeatsDaily` retained for legacy daily behavior.
+A daily quest is still a quest:
 
 | Type | Meaning | May repeat daily | May be a child of |
 |---|---|---|---|
@@ -630,12 +633,20 @@ From `front/`, run:
 ```sh
 gjs tests/goal-model.js
 gjs tests/daily-reset.js
+gjs tests/schedule-model.js
+gjs tests/reminders.js
 gjs tests/streak-motion.js
 gjs tests/statistics-model.js
 gjs tests/statistics-sync.js
 TZ=America/New_York gjs tests/statistics-model.js
+TZ=America/New_York gjs tests/schedule-model.js
+TZ=America/New_York gjs tests/reminders.js
 python3 tests/statistics-browser.py webkit
 python3 tests/statistics-browser.py webkit 390 844
+STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit 390 844
+GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit
+GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit 390 844
 ```
 
 The JavaScript tests also support Node. The browser runner accepts a Chromium executable
@@ -703,3 +714,65 @@ changed. Optional cross-highlighting of Skills was not added; existing Skill lin
 
 Browser check: `STATISTICS_TEST_SCRIPT=goals-ui-browser.js python3 tests/statistics-browser.py webkit`
 (add `390 844` for mobile or `1024 900` for medium width).
+
+## Schedule and reminder model (optional additions to schema v3)
+
+`Goal.schedule` is optional: `{ type: "one-time" | "daily" | "weekly" | "custom",
+time?: "HH:MM", daysOfWeek?: number[] }`. Weekdays are 1=Monday through 7=Sunday.
+`Goal.reminder` is optional: `{ enabled: boolean, offset: "0m" | "5m" | "15m" | "30m" }`.
+The form omits both fields for One-time. Daily writes `repeatsDaily: true`;
+weekly/custom write `false`. Step/Quest can repeat, Arc cannot. Weekly and Custom
+both use a nonempty selected-day set. Untimed schedules are valid but cannot notify.
+
+`GoalSchedule.validate()` rejects invalid new values before state mutation, and
+`GoalSchedule.read()` safely ignores malformed persisted optional data. Legacy daily
+behavior remains the fallback. After existing type conversion, `migrateGoalSchedule()`
+adds `{ type: "daily" }` and `{ enabled: false, offset: "0m" }` only to Goals whose
+`repeatsDaily === true` and schedule is absent. It runs for local and cloud reads,
+preserves existing schedules, and does not change `updatedAt`, XP or history.
+
+`GoalSchedule.shouldReset()` preserves the legacy local-day reset for daily Goals;
+weekly/custom reopen on the next selected day, including after suspended tabs.
+Ordinary Goals never reset. Automatic reset never reverses rewards. Browser reminder
+Mark done reuses `toggleGoalCompletion()`, with optional `occurrenceKey` on its history
+record and `completedScheduleDay` on the Goal. Completion statistics always use the
+actual local completion day. The extra scheduled day prevents an early reminder for
+tomorrow from resetting tonight; late completion remains checked until the next
+eligible day. Undo removes that recorded reward and clears the occurrence link.
+
+Optional `state.reminderReceipts` maps Goal IDs to `{ key, status: "done" | "skipped" }`.
+There is at most one receipt per Goal; deletion and schedule changes clear it. Skip
+has no effect on completion, streak or XP. Receipt keys include Goal, schedule and
+local occurrence date. Pending entries are calculated, never independent totals.
+Only the latest due occurrence is retained; no pre-creation historical backlog is
+invented. Checks consider tomorrow too, because offsets can cross midnight.
+
+`createReminderSystem()` checks at startup, every 60 seconds, after state changes
+and on resume. A missed scheduled time stays actionable in the bell panel. Pending
+items disappear after completion, Skip, deletion or reminder removal. Notification
+clicks focus the app and reveal the Goal, clearing dashboard search if necessary.
+Both pages preserve the shared Goal actions menus and all existing Statistics UI.
+
+`createBrowserReminders()` requests permission only from the checkbox interaction.
+Missing APIs, insecure contexts, denial, request rejection and constructor errors
+leave the in-app system usable. No service worker or background push is involved.
+Permission and constructor behavior are covered with an injected Notification test
+double, not a real operating-system permission dialog. The browser runner also
+captures page errors, unhandled rejections and console warnings. WebKit/GTK harness
+messages are separate from page-console failures.
+
+Browser delivery receipts use `neonGoalTracker.v1.reminderDelivery`, a device-local
+cache with at most one entry per current Goal. They are not cloud user progress.
+Web Locks serialize delivery and reminder actions across supported same-origin tabs;
+without that API, stable notification tags and receipt checks provide best-effort
+deduplication. Newer local-storage state is reloaded before reminder actions.
+
+Times remain local strings. DST gaps advance by the local Date gap; repeated hours
+produce one occurrence key. Closed/suspended tabs cannot guarantee punctual delivery.
+The default One-time path and legacy Goals remain usable if notifications fail.
+Quota/unavailable-storage errors show a visible notice; failed Goal create/edit or
+completion writes roll back their in-memory mutation so retry cannot duplicate XP.
+
+Regression coverage includes optional-field round trips, migration/idempotency,
+weekday/time/offset validation, midnight/DST, missed occurrences, persistent Skip,
+completion/undo, browser permission outcomes and both desktop/mobile Goal pages.

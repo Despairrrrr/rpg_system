@@ -241,7 +241,7 @@ assert(tree.includes('goalTypeOrder'), 'the goal tree still orders by type');
 // ===============================
 
 const typeChange = section(app, 'function handleGoalTypeChange', 'els.goalType.addEventListener');
-const sync = section(app, 'function syncGoalTypeUI', 'function openGoalModal');
+const sync = section(app, 'function syncGoalTypeUI', 'function syncGoalScheduleUI');
 assert(!typeChange.includes('goalTitle.value') && !typeChange.includes('goalForm'), 'changing type must not touch the title input');
 assert(!sync.includes('goalTitle.value'), 'syncing the type must only set the placeholder');
 assert(sync.includes('els.goalTitle.placeholder ='), 'syncing the type sets the placeholder');
@@ -258,9 +258,10 @@ for (const page of [['dashboard', index], ['skill page', skillPage]]) {
   assert(form.includes('<option value="step">Step</option>'), name + ': Step in the type selector');
   assert(form.includes('<option value="quest">Quest</option>'), name + ': Quest in the type selector');
   assert(form.includes('<option value="arc">Arc</option>'), name + ': Arc in the type selector');
-  assert(!/>Daily</.test(form), name + ': Daily is not a goal type');
-  assert(!/value="daily"|value="short"|value="medium"|value="long"/.test(form), name + ': no legacy type values');
-  assert(form.includes('id="goalRepeat"') && form.includes('Repeat daily'), name + ': a Repeat daily control exists');
+  const roleSelect = section(form, '<select id="goalType"', '</select>');
+  assert(!/>Daily</.test(roleSelect), name + ': Daily is not a goal type');
+  assert(!/value="daily"|value="short"|value="medium"|value="long"/.test(roleSelect), name + ': no legacy type values');
+  assert(form.includes('id="goalRepeat"') && form.includes('Repeating'), name + ': a repeating schedule control exists');
   assert(form.includes('id="goalRepeatField"'), name + ': the recurrence control can be hidden');
   assert(form.includes('id="goalParentField"'), name + ': the parent field can be hidden');
   assert(form.includes('Part of'), name + ': the field is called "Part of"');

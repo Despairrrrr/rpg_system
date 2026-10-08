@@ -14,6 +14,8 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 - `app.js` — state, rendering, CRUD logic, `localStorage` and cloud sync.
 - `statistics-model.js` — completion-history migration, local calendar weeks, weekly aggregations and Life Area operations.
 - `statistics.js` — Statistics view, shared week picker, charts and Life Area management.
+- `schedule-model.js` — schedule validation, recurrence and local reminder times.
+- `reminders.js` — reminder panel, minute checks and optional browser notifications.
 - `login.js` — login page logic, kept separate from `app.js` (which needs the full dashboard DOM).
 - `firebase.init.js` — Firebase configuration + initialization (paste your `firebaseConfig` here).
 - `CRUD.md` — detailed CRUD documentation.
@@ -21,7 +23,7 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 ## Interface decisions to preserve
 
 The top navigation contains **Goals** and **Statistics**, without a Skills tab or inactive
-notification/settings icons. Skills remain in the dashboard sidebar. Goals use the same
+settings icons. The notification bell opens a working reminder panel on both Goal pages. Skills remain in the dashboard sidebar. Goals use the same
 **… → Edit / Delete** menu both on the dashboard and on the Skill detail page. The avatar
 in the profile card is an upload control: it shows a **+** inside the ring until a photo is
 set, and opens the same shared **…** menu with **Load a photo / Delete photo**.
@@ -87,8 +89,9 @@ creates the Firebase user, later ones just sign it in.
 - Goals come in three sizes, not four: a **step** is a concrete action, a **quest** is a meaningful
   outcome, and an **arc** is a larger direction that can contain several quests. A step may sit
   under a quest or an arc, a quest may sit under an arc, and every parent is optional.
-- Recurrence is a separate switch from size: a step or a quest can be marked `Repeat daily` and
-  then shows a `↻ Daily` badge. Completing one keeps the streak alive. The old four types
+- Recurrence is independent of size: Steps and Quests can repeat daily, weekly or on
+  custom weekdays, with an optional local time. The default One-time mode has no
+  scheduling fields. Cards show frequency, days and time (or Any time). The old four types
   (`daily` / `short` / `medium` / `long`) are migrated on load: `daily` becomes a repeating step,
   `short` a step, `medium` a quest and `long` an arc, keeping titles, XP, completion and streaks.
 - Exponential level/XP curve (reaching level N requires (N-1)^2 * 100 XP).
@@ -188,7 +191,7 @@ JSON string. Clearing it is **Delete photo** in the avatar menu.
 The site is purely static — no server needed:
 
 1. Put `index.html`, `login.html`, `skill.html`, `app.js`, `statistics-model.js`, `statistics.js`,
-   `login.js`, `firebase.init.js`, `styles.css` and `assets/` into a repo root (or move them
+   `schedule-model.js`, `reminders.js`, `login.js`, `firebase.init.js`, `styles.css` and `assets/` into a repo root (or move them
    into the repo root from the `front/` folder).
 2. GitHub repo → **Settings → Pages → Build and deployment → Deploy from a branch →
    main / root.**
@@ -216,3 +219,39 @@ appear in two progress columns on wide screens and one on narrow screens (up to 
 with a visible keyboard/touch-accessible
 **… → Edit / Delete** menu. These are presentation changes only; progression and data
 behavior remain unchanged.
+
+### Schedules and reminders
+
+Choose Repeating in Add/Edit Goal, then Daily, Weekly or Custom days. Weekly and
+Custom both repeat on the selected weekdays; select at least one. Arcs remain
+One-time. Time is optional and stored as local `HH:MM`, without UTC conversion.
+Existing daily Goals migrate automatically, retain their XP/history, and have
+reminders disabled until you enable them. `repeatsDaily` remains in saved data.
+
+Send notification becomes available when a repeating Goal has a time. Choose At
+time or 5, 15 or 30 minutes before (default 5). The bell lists the latest due
+occurrence per Goal, including a Missed label after its scheduled time. Mark done
+awards the ordinary reward and records completion today; Skip dismisses just that
+occurrence without XP. Both survive reloads. Removing a schedule clears its reminder.
+
+Reminders are checked every minute while the app is open and when the page resumes.
+Suspended tabs may deliver late; closed tabs do not notify. Browser notifications
+are optional: permission is requested when you enable the checkbox. Denial or an
+unsupported browser still leaves the in-app panel working. Native notifications
+need a supported secure context, normally HTTPS or localhost; some mobile browsers
+require a service worker, which this MVP intentionally does not add. See
+[Notification API support](https://developer.mozilla.org/en-US/docs/Web/API/Notification/Notification).
+
+Times follow the device's current timezone. At a daylight-saving gap, the local
+Date calculation advances by the gap; a repeated local time has one occurrence.
+Weekly/custom completion reopens on the next selected day. Early completion of a
+reminder for tomorrow stays checked through tomorrow; late completion records XP
+on the day you actually complete it. The panel retains the latest due occurrence,
+not an unlimited historical backlog.
+
+The state key and optional Firebase sync stay unchanged. Skip/completion receipts
+travel with state; `neonGoalTracker.v1.reminderDelivery` is a small device-local cache
+that prevents repeated system notifications. Web Locks coordinate reminders between
+supported same-origin tabs; without them, delivery deduplication is best-effort.
+No notification permission or Goal data is saved merely by opening or cancelling a
+form (a browser permission granted during editing remains a browser setting).
