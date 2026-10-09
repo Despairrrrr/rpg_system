@@ -7,7 +7,7 @@ them; update the documentation alongside that change.
 
 ## Preserve the current interface
 
-- `index.html` top navigation contains **Goals** and **Statistics** only. Do not
+- `index.html` top navigation contains **Today's Journey**, **Goals** and **Statistics**, in that order. Do not
   restore a **Skills** navigation tab. Skills remain in the dashboard sidebar;
   clicking a Skill opens `skill.html?id=...`.
 - The notification bell is a working reminder panel on both Goal pages. Preserve its

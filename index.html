@@ -8,17 +8,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <header class="topbar">
     <nav class="nav">
-      <button class="nav-item active" data-section="goals">Goals</button>
+      <button class="nav-item active" data-section="journey">Today’s Journey</button>
+      <button class="nav-item" data-section="goals">Goals</button>
       <button class="nav-item" data-section="statistics">Statistics</button>
     </nav>
 
     <div class="topbar-actions">
-      <label class="search">
+      <label hidden class="search">
         <span class="search-icon">⌕</span>
         <input id="searchInput" type="search" placeholder="Find a goal or skill..." />
       </label>
@@ -39,7 +40,14 @@
   </header>
 
   <main class="dashboard">
-    <section class="main-column">
+    <section class="main-column" id="journeyPage" aria-labelledby="journeyHeading">
+      <div class="section-head"><h1 id="journeyHeading">Today's Journey</h1><button type="button" class="primary-btn" id="addJourneyGoal">+ Add a Goal</button></div>
+      <p id="journeyDate" class="field-hint"></p>
+      <p id="journeySummary" role="status"></p>
+      <progress id="journeyProgress" max="1" value="0" aria-label="Today's goal completion"></progress>
+      <div id="journeyList"></div>
+    </section>
+    <section class="main-column" id="goalsPage" hidden>
       <div class="section-head">
         <h1>MY GOALS</h1>
         <button class="primary-btn" id="openGoalModalBtn">+ Add goal</button>
@@ -185,6 +193,15 @@
       </form>
       <section aria-labelledby="existingAreasTitle"><h3 id="existingAreasTitle">Your Life Areas</h3><div id="existingLifeAreas"></div></section>
       <section aria-labelledby="assignmentsTitle"><h3 id="assignmentsTitle">Skill assignments</h3><p class="statistics-muted">Each Skill can belong to one Life Area, or stay uncategorized.</p><div id="skillAreaAssignments"></div></section>
+    </div>
+  </dialog>
+
+  <dialog class="modal" id="journeyPicker" aria-labelledby="journeyPickerTitle">
+    <div class="modal-card">
+      <div class="modal-head"><h2 id="journeyPickerTitle">Add a Goal</h2><button type="button" class="close-btn" data-close="journeyPicker" aria-label="Close goal picker">×</button></div>
+      <button type="button" class="primary-btn" id="createJourneyGoal">Create a new goal</button>
+      <label>Add an existing goal<input type="search" id="journeySearch" placeholder="Search goals or Skills" /></label>
+      <div id="journeyChoices"></div>
     </div>
   </dialog>
 
@@ -400,6 +417,6 @@
   <script src="statistics.js?v=5"></script>
   <script src="schedule-model.js?v=2"></script>
   <script src="reminders.js?v=2"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

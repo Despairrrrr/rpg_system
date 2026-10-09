@@ -22,7 +22,7 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 
 ## Interface decisions to preserve
 
-The top navigation contains **Goals** and **Statistics**, without a Skills tab or inactive
+The top navigation contains **Today's Journey → Goals → Statistics**, without a Skills tab or inactive
 settings icons. The notification bell opens a working reminder panel on both Goal pages. Skills remain in the dashboard sidebar. Goals use the same
 **… → Edit / Delete** menu both on the dashboard and on the Skill detail page. The avatar
 in the profile card is an upload control: it shows a **+** inside the ring until a photo is
@@ -32,6 +32,15 @@ The Statistics Life Areas dialog assigns existing Skills and intentionally has n
 **+ Create a Skill** button. Create Skills through **+ Add skill** in the dashboard panel.
 New features should preserve these decisions unless the user explicitly changes them.
 See [AGENTS.md](AGENTS.md) and the [current interface contract](CRUD.md#current-interface-contract).
+
+## Today's Journey
+
+Start with today's scheduled Steps and Quests, or use **+ Add a Goal** to select an
+existing goal or create one. Expand Quests to complete their child Steps. The × hides
+any top-level goal for today; add it again through the picker whenever plans change.
+Manual selections and removals clear on the next local day. All views share the same
+Goals, XP and history, and the Skills sidebar animates completion and undo progress.
+No quotas, penalties or separate daily rewards are added.
 
 ## Run
 

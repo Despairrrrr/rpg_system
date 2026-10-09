@@ -8,7 +8,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 
 | Surface | Accepted behavior | Implementation |
 |---|---|---|
-| Top navigation | **Goals** and **Statistics** only; no Skills tab | `index.html`, navigation handler in `app.js` |
+| Top navigation | **Today's Journey** → **Goals** → **Statistics**; no Skills tab | `index.html`, navigation handler in `app.js` |
 | Goal scheduling | Step/Quest One-time and Repeating both show optional Time; only Repeating shows frequency/days. Reminders require a time | `index.html`, `skill.html`, `app.js`, `schedule-model.js` |
 | Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
 | Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
@@ -33,6 +33,30 @@ account for both render paths. The Life Areas dialog intentionally has no
 Old screenshots and commits may show the removed controls. They are not a specification
 for new work. The CRUD snippets below explain individual operations; inspect the actual
 functions before editing so validation, history, migration and shared UI behavior survive.
+
+## Today's Journey
+
+Today's Journey is the default tab and shares the Goals sidebar. It presents existing
+Steps and Quests in one list, using `GoalSchedule.effective()` / `occursOn()` for today's
+recurring goals. One-time goals appear only when manually selected. Direct child Steps
+are expandable inside their Quest, never duplicated as top-level entries while it is shown.
+A child that is independently due/selected can appear on its own when its Quest is hidden.
+Completion and undo reuse `toggleGoalCompletion()`, including history, streaks, player/Skill
+XP, level feedback and progress animation. Completed goals remain below unfinished goals.
+The summary counts distinct top-level goals only.
+
+Optional `state.journey = { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [] }` travels
+in the ordinary `neonGoalTracker.v1` write and Firestore mirror. IDs reference Goals;
+there is no second completion or XP state. Normalization adds the field to old documents,
+removes duplicate/deleted/Arc IDs, tolerates malformed optional fields, and clears both
+lists on a different local date. Maintenance does not bump `updatedAt`. Existing day,
+resume, storage and cloud refresh paths update the view without changing historical facts.
+
+Every top-level card's × hides it for today only, including recurring goals. It changes
+neither the Goal nor its reminders. The searchable existing-goal picker restores hidden
+goals. Creation uses the ordinary Goal dialog limited to Step/Quest and atomically selects
+the new ID on save; Quest cards offer Add Step with the parent preselected. Cancellation
+never writes a selection. Skill creation remains in the shared Skills panel.
 
 ## 1. What CRUD means
 
@@ -645,6 +669,7 @@ does not merge simultaneous changes from multiple devices.
 From `front/`, run:
 
 ```sh
+gjs tests/journey-model.js
 gjs tests/goal-model.js
 gjs tests/daily-reset.js
 gjs tests/schedule-model.js
@@ -655,6 +680,9 @@ gjs tests/statistics-sync.js
 TZ=America/New_York gjs tests/statistics-model.js
 TZ=America/New_York gjs tests/schedule-model.js
 TZ=America/New_York gjs tests/reminders.js
+STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit 390 844
+STATISTICS_TEST_SCRIPT=journey-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
 python3 tests/statistics-browser.py webkit
 python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit
