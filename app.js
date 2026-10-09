@@ -289,6 +289,7 @@ function migrateGoals(goals) {
     (goal) => migrateGoalSchedule({
       ...goal,
       ...migrateGoalType(goal),
+      status: goal.status === "paused" ? "paused" : "active",
     })
   );
 
@@ -311,10 +312,17 @@ function journeyGoals(goals, journey, now = new Date()) {
   const selected = new Set(today.selectedIds);
   const hidden = new Set(today.hiddenIds);
   const included = goals.filter(goal => ['step', 'quest'].includes(goal.type) && !hidden.has(goal.id) &&
-    (selected.has(goal.id) || GoalSchedule.occursOn(GoalSchedule.effective(goal), now)));
+    (selected.has(goal.id) || (GoalSchedule.isEffectivelyActive(goal, goals) && GoalSchedule.occursOn(GoalSchedule.effective(goal), now))));
   const quests = new Set(included.filter(goal => goal.type === 'quest').map(goal => goal.id));
   return included.filter(goal => !(goal.type === 'step' && quests.has(goal.parentGoalId)))
     .sort((a, b) => Number(Boolean(a.completed)) - Number(Boolean(b.completed)));
+}
+
+function journeyChildren(goal, goals, journey) {
+  const today = normalizeJourney(journey, goals);
+  return goals.filter(child => child.type === 'step' && child.parentGoalId === goal.id &&
+    !today.hiddenIds.includes(child.id) &&
+    (today.selectedIds.includes(child.id) || GoalSchedule.isEffectivelyActive(child, goals)));
 }
 
 function migrateState(loaded) {
@@ -1600,6 +1608,10 @@ const GOAL_MENU_ITEMS = [
       deleteGoal(goal.id);
     },
   },
+  {
+    label: goal => goal.status === 'paused' ? 'Resume goal' : 'Pause goal',
+    run: goal => setGoalStatus(goal.id, goal.status === 'paused' ? 'active' : 'paused'),
+  },
 ];
 
 const GOAL_MENU_GAP = 6;
@@ -1621,7 +1633,7 @@ function createGoalMenuItem(descriptor) {
       : "goal-menu-item";
 
   item.textContent =
-    descriptor.label;
+    typeof descriptor.label === "function" ? "" : descriptor.label;
 
   item.setAttribute(
     "role",
@@ -1726,12 +1738,14 @@ function openGoalMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal ac
       const descriptor =
         actions[index];
 
+      item.hidden = !descriptor;
       if (!descriptor) {
+        item.disabled = true;
+        item.textContent = '';
         return;
       }
 
-      item.textContent =
-        descriptor.label;
+      item.textContent = typeof descriptor.label === 'function' ? descriptor.label(goal) : descriptor.label;
 
       item.className =
         descriptor.modifier
@@ -1766,7 +1780,7 @@ function openGoalMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal ac
   // Focus the first item that can take it, so a leading disabled entry
   // cannot swallow the open.
   (menu.items.find(
-    (item) => !item.disabled
+    (item) => !item.hidden && !item.disabled
   ) || menu.items[0]).focus();
 }
 
@@ -1840,7 +1854,7 @@ function getGoalMenu() {
           closeGoalMenu();
 
           if (goal) {
-            goalMenu.actions[index].run(goal);
+            goalMenu.actions[index]?.run(goal);
           }
         }
       );
@@ -1850,10 +1864,8 @@ function getGoalMenu() {
   el.addEventListener(
     "keydown",
     (event) => {
-      const index =
-        items.indexOf(
-          document.activeElement
-        );
+      const enabled = items.filter(item => !item.hidden && !item.disabled);
+      const index = enabled.indexOf(document.activeElement);
 
       if (index === -1) {
         return;
@@ -1863,7 +1875,7 @@ function getGoalMenu() {
         ArrowDown: index + 1,
         ArrowUp: index - 1,
         Home: 0,
-        End: items.length - 1,
+        End: enabled.length - 1,
       };
 
       const next = keys[event.key];
@@ -1880,25 +1892,7 @@ function getGoalMenu() {
 
       event.preventDefault();
 
-      // A disabled item cannot take focus, so it is stepped over instead
-      // of trapping the keyboard. The start is wrapped first, because
-      // ArrowDown on the last item points one past the end, and each
-      // step advances by one so the loop actually moves.
-      let target =
-        (next + items.length) %
-        items.length;
-
-      for (let step = 0; step < items.length; step += 1) {
-        if (!items[target].disabled) {
-          break;
-        }
-
-        target =
-          (target + 1) %
-          items.length;
-      }
-
-      items[target].focus();
+      enabled[(next + enabled.length) % enabled.length].focus();
     }
   );
 
@@ -1917,6 +1911,12 @@ function getGoalMenu() {
 // Roving focus inside the menu, one trigger per card. Clicking the
 // same trigger again toggles it shut.
 function createGoalActionsMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label = "Goal actions") {
+  if (actions === GOAL_MENU_ITEMS) {
+    const status = goal.status === 'paused' ? 'Paused' :
+      GoalSchedule.isEffectivelyActive(goal, state.goals) ? 'Active' : 'Active; paused by an ancestor';
+    trigger.title = status;
+    trigger.setAttribute('aria-label', `Actions for ${goal.title}. ${status}`);
+  }
   trigger.addEventListener(
     "click",
     () => {
@@ -1951,7 +1951,7 @@ function createGoalActionsMenu(trigger, goal, actions = GOAL_MENU_ITEMS, label =
       openGoalMenu(trigger, goal, actions, label);
 
       const items =
-        getGoalMenu().items;
+        getGoalMenu().items.filter(item => !item.hidden && !item.disabled);
 
       items[
         event.key === "ArrowDown"
@@ -2197,7 +2197,7 @@ function renderJourney() {
       if (parent) card.append(journeyElement('p', 'journey-parent field-hint', `Part of ${parent.title}`));
     }
     if (goal.type === 'quest') {
-      const children = state.goals.filter(child => child.type === 'step' && child.parentGoalId === goal.id);
+      const children = journeyChildren(goal, state.goals, state.journey);
       const controls = journeyElement('div', 'journey-quest-controls');
       if (children.length) {
         const expanded = expandedJourneyQuests.has(goal.id);
@@ -2234,12 +2234,12 @@ function renderJourneyChoices() {
   const query = document.getElementById('journeySearch').value.trim().toLowerCase();
   const visible = journeyGoals(state.goals, state.journey);
   const included = new Set(visible.map(goal => goal.id));
-  const quests = new Set(visible.filter(goal => goal.type === 'quest').map(goal => goal.id));
+  const nested = new Set(visible.filter(goal => goal.type === 'quest').flatMap(goal => journeyChildren(goal, state.goals, state.journey).map(child => child.id)));
   for (const goal of state.goals) {
     if (!['step', 'quest'].includes(goal.type)) continue;
     const skill = state.skills.find(item => item.id === goal.skillId);
     if (!`${goal.title} ${goal.description || ''} ${skill?.name || ''}`.toLowerCase().includes(query)) continue;
-    const inToday = included.has(goal.id) || (goal.type === 'step' && quests.has(goal.parentGoalId));
+    const inToday = included.has(goal.id) || nested.has(goal.id);
     const button = journeyButton('', 'journey-choice', () => {
       if (changeJourneySelection(goal.id, true)) document.getElementById('journeyPicker').close();
     });
@@ -2980,6 +2980,7 @@ function createGoal(data) {
   const previous = structuredClone(state);
   const newGoal = {
     id: crypto.randomUUID(),
+    status: "active",
 
     title:
       data.title.trim(),
@@ -3218,6 +3219,23 @@ function toggleGoalCompletion(
 }
 
 
+// Status is independent of completion, rewards and form/schedule edits.
+function setGoalStatus(id, status) {
+  syncStoredProgress();
+  const goal = findGoalById(state.goals, id);
+  if (!goal || !['active', 'paused'].includes(status)) return false;
+  if ((goal.status === 'paused' ? 'paused' : 'active') === status) return true;
+  const previous = structuredClone(state);
+  goal.status = status;
+  GoalSchedule.resumeReminders(state.goals, previous.goals);
+  if (!saveState()) { state = previous; render(); return false; }
+  render();
+  const selector = isSkillPage ? '.goal-tree' : document.getElementById('journeyPage').hidden ? '#goalsPage' : '#journeyList';
+  const card = document.querySelector(`${selector} [data-id="${CSS.escape(id)}"], ${selector} [data-goal-id="${CSS.escape(id)}"]`);
+  (card?.querySelector('.goal-menu-trigger') || document.getElementById('addJourneyGoal'))?.focus();
+  return true;
+}
+
 // UPDATE
 function updateGoal(
   id,
@@ -3246,6 +3264,7 @@ function updateGoal(
   }
 
   syncGoalParents();
+  GoalSchedule.resumeReminders(state.goals, previous.goals);
 
   if (!saveState()) { state = previous; reportGoalError("Could not save this Goal. Please try again."); return false; }
 
@@ -3275,6 +3294,7 @@ function deleteGoal(id) {
     return;
   }
 
+  const previous = structuredClone(state);
   if (state.reminderReceipts) delete state.reminderReceipts[id];
   if (state.oneTimeSchedules) delete state.oneTimeSchedules[id];
   state.goals =
@@ -3284,10 +3304,12 @@ function deleteGoal(id) {
     );
 
   syncGoalParents();
+  GoalSchedule.resumeReminders(state.goals, previous.goals);
 
-  saveState();
+  if (!saveState()) { state = previous; render(); return false; }
 
   render();
+  return true;
 }
 
 

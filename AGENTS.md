@@ -14,7 +14,7 @@ them; update the documentation alongside that change.
   pending count, Mark done/Skip actions and keyboard dismissal. Do not add inactive
   settings buttons or other placeholder controls.
 - Every Goal, both on the dashboard and in the Skill detail tree, has one **…**
-  actions trigger. Its menu contains **Edit** and **Delete**. Reuse
+  actions trigger. Its menu contains **Edit**, **Delete** and own-status **Pause goal / Resume goal**. Reuse
   `createGoalActionsMenu()` and `GOAL_MENU_ITEMS` in `app.js`; do not replace the tree
   menu with permanently visible Edit/Delete buttons. Skill rows use this shared menu mechanism with Skill-specific Edit/Delete handlers;
   do not restore permanent action buttons or hover-only controls.
@@ -81,6 +81,19 @@ them; update the documentation alongside that change.
   Step/Quest/Arc differ subtly in padding and title size. Completed cards are quieter
   without dimming active child Goals. XP is secondary and Skill/parent metadata uses
   compact wrapping tags. Skills use two aligned progress columns on wide screens and one on screens up to 720px.
+
+## Goal status contract
+
+- Goals store `status: "active" | "paused"`; missing/invalid values migrate to active.
+  An ancestor pause affects descendants dynamically, never by changing child statuses.
+- Automatic Today inclusion and reminders require effective activity. Manual Today
+  selections override pausing for presentation/completion only, including nested Steps.
+  Today × remains a separate date-scoped removal; pausing never changes rewards/history.
+- `GoalSchedule.isEffectivelyActive()` is shared by Today and reminders. On effective
+  resume, including reparenting/deleting an ancestor, optional Goal `remindersResumeAt`
+  suppresses reminders whose due timestamp precedes resume. Preserve schedule settings.
+  Own/inherited status is explained through the shared menu trigger's accessible label
+  and tooltip; keep layouts and manual completion controls unchanged.
 
 ## Schedule and reminder contract
 

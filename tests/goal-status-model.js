@@ -1,0 +1,53 @@
+// Run: gjs tests/goal-status-model.js (also supports Node).
+const read = name => typeof require === 'function' ? require('fs').readFileSync(name, 'utf8') : new TextDecoder().decode(imports.gi.GLib.file_get_contents(name)[1]);
+const Statistics = eval(read('statistics-model.js') + '\nStatistics;');
+const GoalSchedule = eval(read('schedule-model.js') + '\nGoalSchedule;');
+const source = read('app.js');
+const model = eval(source.slice(source.indexOf('// <goal-model>'), source.indexOf('// </goal-model>')) + '\n({migrateState, journeyGoals, journeyChildren});');
+const assert = (ok, message) => { if (!ok) throw new Error(message); };
+const clone = value => JSON.parse(JSON.stringify(value));
+const now = new Date(2026, 9, 9, 12);
+const make = (id, type, parentGoalId='', extra={}) => ({id,type,parentGoalId,skillId:'s',title:id,description:'',xp:10,createdAt:'2026-10-01T00:00:00',...extra});
+const scheduled = {schedule:{type:'daily',time:'10:00'},reminder:{enabled:true,offset:'0m'}};
+let state = model.migrateState({updatedAt:123,profile:{name:'A'},streak:{count:4,date:'2026-10-09'},skills:[{id:'s',xp:90}],goals:[
+ make('a','arc'),make('q','quest','a',scheduled),make('c','step','q',scheduled),make('p','step','q',{...scheduled,status:'paused'}),
+ make('d','step','',scheduled),make('w','quest','',{schedule:{type:'weekly',time:'10:00',daysOfWeek:[1]},reminder:{enabled:true,offset:'0m'},status:'unknown'})
+]});
+assert(state.goals.filter(g=>g.status==='active').length===5 && state.goals[3].status==='paused', 'missing/invalid statuses migrate active, explicit pauses survive');
+assert(state.updatedAt===123 && state.skills[0].xp===90 && !state.completionHistory.length, 'migration preserves facts and timestamps');
+assert(JSON.stringify(model.migrateState(state))===JSON.stringify(state), 'idempotent migration');
+const facts = JSON.stringify([state.skills,state.streak,state.completionHistory]);
+const get = id => state.goals.find(g=>g.id===id);
+const set = (id,status,date=now) => {const before=clone(state.goals);get(id).status=status;GoalSchedule.resumeReminders(state.goals,before,date.getTime());};
+const today = {date:GoalSchedule.dayKey(now),selectedIds:[],hiddenIds:[]};
+const ids = () => model.journeyGoals(state.goals,today,now).map(g=>g.id).join();
+assert(ids()==='q,d','active automatic inclusion and nested deduplication');
+set('a','paused');
+assert(!GoalSchedule.isEffectivelyActive(get('c'),state.goals) && get('c').status==='active', 'Arc pause inherited without overwriting own status');
+assert(ids()==='d' && GoalSchedule.pending(state,now).every(e=>!['q','c','p'].includes(e.goal.id)), 'inherited Today and reminder suppression');
+today.selectedIds=['q','c','p'];
+assert(ids()==='q,d', 'manual paused selection overrides auto exclusion without duplicate Steps');
+assert(model.journeyChildren(get('q'),state.goals,{...today,date:Statistics.dayKey()}).length===2, 'explicit paused children remain available');
+today.hiddenIds=['q'];assert(ids()==='c,p,d','daily removal independent of pause');
+set('a','active');assert(get('p').status==='paused' && GoalSchedule.isEffectivelyActive(get('c'),state.goals), 'resume preserves independent child pause');
+assert(GoalSchedule.pending(state,now).every(e=>!['q','c'].includes(e.goal.id)), 'resume does not restore due or missed reminders');
+state=JSON.parse(JSON.stringify(state));
+assert(GoalSchedule.pending(state,new Date(2026,9,10,10)).some(e=>e.goal.id==='c'), 'next reminder after reload works');
+set('q','paused');set('c','paused');set('q','active');assert(!GoalSchedule.isEffectivelyActive(get('c'),state.goals),'independently paused child stays paused');
+set('c','active');assert(GoalSchedule.isEffectivelyActive(get('c'),state.goals),'independent resume');
+set('w','paused');set('w','active');
+assert(!GoalSchedule.pending(state,new Date(2026,9,11,12)).some(e=>e.goal.id==='w'), 'weekly off-day resume has no backlog');
+assert(GoalSchedule.pending(state,new Date(2026,9,12,10)).some(e=>e.goal.id==='w'), 'next weekly reminder returns');
+set('a','paused');let previous=clone(state.goals);get('q').parentGoalId='';GoalSchedule.resumeReminders(state.goals,previous,now.getTime());
+assert(GoalSchedule.isEffectivelyActive(get('c'),state.goals) && get('c').remindersResumeAt===now.getTime(), 'reparenting resumes descendants without backlog');
+get('q').parentGoalId='a';previous=clone(state.goals);state.goals=state.goals.filter(g=>g.id!=='a');GoalSchedule.resumeReminders(state.goals,previous,now.getTime());
+assert(GoalSchedule.isEffectivelyActive(get('q'),state.goals) && get('q').remindersResumeAt===now.getTime(), 'deleted ancestor handled');
+const broken=[make('x','step','missing')];assert(GoalSchedule.isEffectivelyActive(broken[0],broken),'missing parent safely stops traversal');
+const cycle=[make('x','quest','y'),make('y','arc','x')];assert(!GoalSchedule.isEffectivelyActive(cycle[0],cycle),'cycle never loops or delivers reminders');
+const early=make('early','step','',{schedule:{type:'daily',time:'00:05'},reminder:{enabled:true,offset:'30m'},remindersResumeAt:new Date(2026,9,9,23,40).getTime()});
+assert(!GoalSchedule.pending({goals:[early]},new Date(2026,9,10,0,1)).length,'cross-midnight reminder due during pause stays suppressed');
+assert(GoalSchedule.pending({goals:[early]},new Date(2026,9,10,23,35)).length===1,'following cross-midnight occurrence works');
+const once=make('once','step','',{schedule:{type:'one-time',time:'10:00'},reminder:{enabled:true,offset:'0m'},remindersResumeAt:now.getTime()});
+assert(!GoalSchedule.pending({goals:[once],oneTimeSchedules:{once:{day:'2026-10-09',configuredAt:now.getTime()-86400000}}},now).length,'one-time deadline during pause has no backlog');
+assert(JSON.stringify([state.skills,state.streak,state.completionHistory])===facts,'status transitions never change XP/streak/history');
+(typeof print==='function'?print:console.log)('PASS: status migration, inheritance, own pauses, manual Today exceptions, removal, resume cutoffs, midnight/weekly/one-time reminders, hierarchy edits and unchanged rewards');

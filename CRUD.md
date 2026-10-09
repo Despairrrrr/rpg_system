@@ -12,7 +12,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Goal scheduling | Step/Quest One-time and Repeating both show optional Time; only Repeating shows frequency/days. Reminders require a time | `index.html`, `skill.html`, `app.js`, `schedule-model.js` |
 | Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
 | Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
-| Dashboard Goals | One **…** menu containing Edit and Delete | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
+| Dashboard Goals | One **…** menu containing Edit, Delete and own-status Pause goal / Resume goal | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
 | Goals inside a Skill | The same **…** menu; no permanent Edit/Delete buttons | `renderGoalTreeNode()`, `createGoalActionsMenu()` |
 | Skill rows | Aligned progress list with **… → Edit / Delete** and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
 | Skill creation | **+ Add skill** in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
@@ -20,12 +20,13 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Statistics overview | Week selector plus Goals completed and XP earned only; no Active Skills metric | `#weekSummary`, `#summaryGoals`, `#summaryXp` |
 | Statistics charts | No Skill icons; dynamic user-created Life Areas, not a fixed set of six | `statistics.js`, `statistics-model.js` |
 
-The shared Goal menu uses `GOAL_MENU_ITEMS`, calls `openGoalModal()` and `deleteGoal()`,
+The shared Goal menu uses `GOAL_MENU_ITEMS`, calls `openGoalModal()`, `deleteGoal()` and `setGoalStatus()`,
 and retains delete confirmation, keyboard navigation, Escape and outside-click dismissal.
 The profile photo reuses that same shared menu through `PHOTO_MENU_ITEMS`, so the avatar
 inherits its positioning and keyboard behavior instead of growing a second menu. Because
 the element is shared, `openGoalMenu()` repaints item labels, modifiers and `disabled`
-per open; a descriptor may compute `disabled` as a function.
+per open; a descriptor may compute `label` or `disabled` as a function. Shorter Skill/photo
+menus hide unused items, and keyboard navigation skips hidden and disabled entries.
 The dashboard and Skill page render Goals separately, so changes to Goal actions must
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
@@ -38,8 +39,8 @@ functions before editing so validation, history, migration and shared UI behavio
 
 Today's Journey is the default tab and shares the Goals sidebar. It presents existing
 Steps and Quests in one list, using `GoalSchedule.effective()` / `occursOn()` for today's
-recurring goals. One-time goals appear only when manually selected. Direct child Steps
-are expandable inside their Quest, never duplicated as top-level entries while it is shown.
+recurring effectively active goals. One-time goals appear only when manually selected. Direct child Steps
+are expandable inside their Quest when effectively active or explicitly selected, never duplicated as top-level entries while it is shown.
 A child that is independently due/selected can appear on its own when its Quest is hidden.
 Completion and undo reuse `toggleGoalCompletion()`, including history, streaks, player/Skill
 XP, level feedback and progress animation. Completed goals remain below unfinished goals.
@@ -57,6 +58,34 @@ neither the Goal nor its reminders. The searchable existing-goal picker restores
 goals. Creation uses the ordinary Goal dialog limited to Step/Quest and atomically selects
 the new ID on save; Quest cards offer Add Step with the parent preselected. Cancellation
 never writes a selection. Skill creation remains in the shared Skills panel.
+
+## Active / Paused Goals
+
+Every role stores `status: "active" | "paused"`, independent of completion. New Goals
+are active; migration defaults missing or invalid statuses to active without changing
+`updatedAt`, XP, streaks, completion history, schedules or child statuses. Status changes
+use the ordinary save, rollback, multi-tab and optional Firestore synchronization paths.
+
+The shared menu adds **Pause goal / Resume goal** based on the Goal's own status. Its
+trigger tooltip and accessible label distinguish inherited pausing. Goals and Skill trees
+retain their existing layout and completion controls. `GoalSchedule.isEffectivelyActive()`
+walks existing ancestors with a cycle guard; existing parent normalization still removes
+invalid relationships. Resuming a parent leaves independently paused children paused.
+
+Effectively paused Goals stop automatic Today inclusion and reminders. Manual selections
+remain visible and completable without resuming anything. Paused child Steps must be
+explicitly selected to appear inside a Today Quest. × still hides the selection for today
+without changing status. Completing or undoing a paused Goal uses the existing reward path.
+Normal recurrence resets remain independent of status.
+
+When a Goal becomes effectively active, optional numeric `goal.remindersResumeAt` stores
+the resume timestamp in milliseconds in the same document. Both reminder channels ignore
+occurrences whose **reminder due time** is earlier than this cutoff, including missed and
+early cross-midnight reminders. An occurrence due at/after resume follows ordinary rules;
+a past one-time reminder does not return. Future schedules/settings remain intact. A
+parent resume, reparenting or parent deletion applies the cutoff to newly active descendants
+without changing their own status. No completion or Skip receipts are fabricated. Pausing
+also closes this page's visible browser notifications through the existing reminder refresh.
 
 ## 1. What CRUD means
 
@@ -106,6 +135,7 @@ A goal looks like this:
 {
   id: "uuid",
   title: "Read 20 pages",
+  status: "active",      // active or paused; ancestors may also pause this Goal
   type: "step",          // "step" | "quest" | "arc"
   repeatsDaily: true,    // daily compatibility flag; only Step/Quest
   schedule: { type: "daily", time: "07:00" }, // optional
@@ -285,7 +315,7 @@ ordered.forEach((goal) => {
   // clone template
   // insert title, description, XP
   // show the "Daily" badge when goal.repeatsDaily
-  // attach the shared … menu with Edit/Delete actions
+  // attach the shared … menu with Edit/Delete and Pause/Resume actions
   // append card
 });
 ```
@@ -297,7 +327,7 @@ completion, undo, type changes and deletion stay correct without extra state. Th
 counter deliberately ignores the search filter and always reflects the whole column.
 The dashboard has one column per type (`STEPS`, `QUESTS`, `ARCS`) and the skill page
 nests the same goals under their Arc or Quest. Both views use
-`createGoalActionsMenu()` for Edit/Delete. A repeating goal is marked with a `↻ Daily`
+`createGoalActionsMenu()` for Edit/Delete and own-status Pause/Resume. A repeating goal is marked with a `↻ Daily`
 badge in both places; the skill-page tree keeps its hierarchy order and has no counter.
 Browser check: `STATISTICS_TEST_SCRIPT=goals-order-browser.js python3 tests/statistics-browser.py webkit`.
 
@@ -669,6 +699,7 @@ does not merge simultaneous changes from multiple devices.
 From `front/`, run:
 
 ```sh
+gjs tests/goal-status-model.js
 gjs tests/journey-model.js
 gjs tests/goal-model.js
 gjs tests/daily-reset.js
@@ -680,6 +711,8 @@ gjs tests/statistics-sync.js
 TZ=America/New_York gjs tests/statistics-model.js
 TZ=America/New_York gjs tests/schedule-model.js
 TZ=America/New_York gjs tests/reminders.js
+STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
+GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844

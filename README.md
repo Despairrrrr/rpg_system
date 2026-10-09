@@ -24,7 +24,7 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 
 The top navigation contains **Today's Journey → Goals → Statistics**, without a Skills tab or inactive
 settings icons. The notification bell opens a working reminder panel on both Goal pages. Skills remain in the dashboard sidebar. Goals use the same
-**… → Edit / Delete** menu both on the dashboard and on the Skill detail page. The avatar
+**… → Edit / Delete / Pause goal (or Resume goal)** menu both on the dashboard and on the Skill detail page. The avatar
 in the profile card is an upload control: it shows a **+** inside the ring until a photo is
 set, and opens the same shared **…** menu with **Load a photo / Delete photo**.
 
@@ -41,6 +41,12 @@ any top-level goal for today; add it again through the picker whenever plans cha
 Manual selections and removals clear on the next local day. All views share the same
 Goals, XP and history, and the Skills sidebar animates completion and undo progress.
 No quotas, penalties or separate daily rewards are added.
+
+Pause a Step, Quest or Arc through its **…** menu to stop automatic Today inclusion
+and reminders. Descendants inherit the pause without changing their own statuses.
+Resume restores scheduling while keeping independently paused children paused; reminders
+due before resume do not return as a backlog. Paused goals can still be manually selected
+for Today and completed normally. The × remains a separate removal for today only.
 
 ## Run
 
@@ -119,7 +125,8 @@ creates the Firebase user, later ones just sign it in.
   single `position: fixed` element on `<body>` (`role="menu"`, `aria-haspopup` /
   `aria-expanded` on the trigger), anchored right-aligned under the trigger, flipped above when
   the viewport ends first, with arrow-key roaming, `Escape` to close and focus back on the
-  trigger, and a click-away to dismiss. It calls `openGoalModal()` / `deleteGoal()` unchanged, so
+  trigger, and a click-away to dismiss. It calls `openGoalModal()` / `deleteGoal()` and
+  `setGoalStatus()` for Pause/Resume, so
   the `confirm()` on delete still applies. The Skill detail Goal tree uses this same menu;
   Skill rows use the same accessible menu with Skill-specific Edit/Delete actions.
 - Optional sign-in via a dedicated `login.html` page with a "Continue with Google" button, syncing progress across devices (last-write-wins).

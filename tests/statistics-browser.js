@@ -35,7 +35,7 @@
     treeMenu.click();
     assert(treeMenu.getAttribute('aria-expanded') === 'true', 'Skill goal overflow menu opens');
     const menuItems = document.querySelectorAll('.goal-menu-item');
-    assert([...menuItems].map(item => item.textContent).join() === 'Edit,Delete', 'Skill goal menu contains both actions');
+    assert([...menuItems].map(item => item.textContent).join() === 'Edit,Delete,Pause goal', 'Skill goal menu contains both actions');
     menuItems[0].click();
     assert($('goalModal').open && $('goalId').value === goal.id, 'Skill goal menu edits the correct goal');
     $('goalModal').close();

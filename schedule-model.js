@@ -151,10 +151,35 @@ const GoalSchedule = (() => {
     return null;
   }
 
+  // Application migrations normalize parent links. Guard cycles here as well so
+  // reminder delivery remains safe even with a damaged or not-yet-normalized document.
+  function isEffectivelyActive(goal, goals) {
+    const seen = new Set();
+    while (goal) {
+      if (goal.status === 'paused' || seen.has(goal.id)) return false;
+      seen.add(goal.id);
+      goal = goals.find(parent => parent.id === goal.parentGoalId);
+    }
+    return true;
+  }
+
+  // A resume (including detaching from a paused ancestor) starts reminders afresh.
+  // Store only a cutoff, never synthetic completion/Skip records or changed schedules.
+  function resumeReminders(goals, previousGoals, now = Date.now()) {
+    for (const goal of goals) {
+      const previous = previousGoals.find(item => item.id === goal.id);
+      if (previous && !isEffectivelyActive(previous, previousGoals) && isEffectivelyActive(goal, goals)) {
+        goal.remindersResumeAt = now;
+      }
+    }
+  }
+
   function pending(state, now = new Date()) {
     return (state.goals || []).flatMap(goal => {
+      if (!isEffectivelyActive(goal, state.goals)) return [];
       const entry = latestDue(goal, now, state.oneTimeSchedules?.[goal.id]);
       if (!entry || (goal.completed && !shouldReset(goal, now))) return [];
+      if (Number.isFinite(goal.remindersResumeAt) && entry.dueAt < goal.remindersResumeAt) return [];
       const receipt = state.reminderReceipts?.[goal.id];
       if (receipt?.key === entry.key && ['done', 'skipped'].includes(receipt.status)) return [];
       // A completion before the reminder on the same occurrence day also
@@ -165,5 +190,5 @@ const GoalSchedule = (() => {
     }).sort((a, b) => b.scheduledAt - a.scheduledAt || a.key.localeCompare(b.key));
   }
 
-  return { types, offsets, validTime, read, reminder, validate, effective, dayKey, oneTimeAnchor, occursOn, shouldReset, label, latestDue, pending };
+  return { types, offsets, validTime, read, reminder, validate, effective, dayKey, oneTimeAnchor, occursOn, shouldReset, label, latestDue, isEffectivelyActive, resumeReminders, pending };
 })();
