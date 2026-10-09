@@ -73,7 +73,9 @@ creates the Firebase user, later ones just sign it in.
 - Profile name editing.
 - Browser persistence through `localStorage`.
 - Search across goals and skills.
-- Automatic goal counts.
+- Automatic goal counts showing the remaining work: completed non-repeating Goals are
+  excluded, while repeating Goals stay counted until their reset. Completed Goals sort to
+  the bottom of their column.
 - Statistics: daily completion counts, the top five Skills by weekly XP, and Life Area shares of categorized weekly XP. All use the same Monday–Sunday week; future weeks are disabled.
 - Statistics uses a compact title/week/summary header, two upper chart panels, and a
   full-width Life Areas radar/breakdown. The summary contains **Goals completed** and
@@ -214,8 +216,9 @@ Run presentation-state checks from `front` with `gjs tests/streak-motion.js` or 
 ### Goals and Skills presentation
 
 Goal columns carry the strong neon accents; inner cards use softer borders. Steps are
-compact, Quests medium, and Arcs slightly more spacious. Completed Goals are quieter, XP
-is secondary to the title, and Skill/parent metadata uses compact wrapping tags. Skills
+compact, Quests medium, and Arcs slightly more spacious. Completed Goals are quieter and
+sort to the bottom of their column, XP is secondary to the title, and Skill/parent
+metadata uses compact wrapping tags. Skills
 appear in two progress columns on wide screens and one on narrow screens (up to 720px),
 with a visible keyboard/touch-accessible
 **… → Edit / Delete** menu. These are presentation changes only; progression and data

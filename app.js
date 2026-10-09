@@ -2103,9 +2103,16 @@ function renderGoals() {
           goal.type === type
       );
 
+    // Show only what still needs doing. A completed repeating Goal will
+    // come back after its reset, so it never leaves the count.
+    const remaining = allOfType.filter(
+      (goal) =>
+        !(goal.completed && !isRepeatingGoal(goal))
+    ).length;
+
     count.textContent =
-      `${allOfType.length} ${
-        allOfType.length === 1
+      `${remaining} ${
+        remaining === 1
           ? "goal"
           : "goals"
       }`;
@@ -2123,6 +2130,13 @@ function renderGoals() {
         return text.includes(query);
       });
 
+    // Completed Goals sink to the bottom of their column without
+    // touching the stored order; the partition keeps both groups stable.
+    const ordered = [
+      ...visible.filter((goal) => !goal.completed),
+      ...visible.filter((goal) => goal.completed),
+    ];
+
     list.innerHTML = "";
 
     if (visible.length === 0) {
@@ -2137,7 +2151,7 @@ function renderGoals() {
       return;
     }
 
-    visible.forEach((goal) => {
+    ordered.forEach((goal) => {
       const template =
         document.querySelector(
           "#goalCardTemplate"

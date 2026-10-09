@@ -248,10 +248,16 @@ Then filtered by type:
 const allOfType = state.goals.filter((goal) => goal.type === type);
 ```
 
-And rendered into the correct column:
+And rendered into the correct column. Completed Goals sink to the bottom of their
+column through a stable partition; the stored `state.goals` order is never changed:
 
 ```js
-visible.forEach((goal) => {
+const ordered = [
+  ...visible.filter((goal) => !goal.completed),
+  ...visible.filter((goal) => goal.completed),
+];
+
+ordered.forEach((goal) => {
   // clone template
   // insert title, description, XP
   // show the "Daily" badge when goal.repeatsDaily
@@ -260,9 +266,16 @@ visible.forEach((goal) => {
 });
 ```
 
-The dashboard has one column per type (`STEPS`, `QUESTS`, `ARCS`) and the skill page nests
-the same goals under their Arc or Quest. Both views use `createGoalActionsMenu()` for
-Edit/Delete. A repeating goal is marked with a `↻ Daily` badge in both places.
+The dashboard header counter shows the open workload, not the total:
+`total - completed non-repeating` (repeating Goals are excluded because they return
+after their reset). It is computed on every render from `isRepeatingGoal()`, so
+completion, undo, type changes and deletion stay correct without extra state. The
+counter deliberately ignores the search filter and always reflects the whole column.
+The dashboard has one column per type (`STEPS`, `QUESTS`, `ARCS`) and the skill page
+nests the same goals under their Arc or Quest. Both views use
+`createGoalActionsMenu()` for Edit/Delete. A repeating goal is marked with a `↻ Daily`
+badge in both places; the skill-page tree keeps its hierarchy order and has no counter.
+Browser check: `STATISTICS_TEST_SCRIPT=goals-order-browser.js python3 tests/statistics-browser.py webkit`.
 
 No explicit server `GET` request exists because this version has no backend.
 
