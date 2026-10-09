@@ -2758,9 +2758,20 @@ function validateGoalWrite(data) {
   if (!goalTypes.includes(data.type)) throw new Error('Choose a valid Goal type.');
   const xp = Number(data.xp);
   if (!Number.isFinite(xp) || xp < 0 || !Number.isInteger(xp)) throw new Error('Enter a valid XP reward.');
+  if (!data.schedule && data.reminder?.enabled) throw new Error('Set a time to enable reminders');
   const optional = Object.prototype.hasOwnProperty.call(data, 'schedule')
     ? GoalSchedule.validate(data.schedule, data.reminder, data.type) : {};
   return { ...data, ...buildGoalPatch(data, state.goals), title, description, xp, ...optional };
+}
+
+function syncOneTimeSchedule(goal, previous = null) {
+  const anchor = GoalSchedule.oneTimeAnchor(goal, previous, state.oneTimeSchedules?.[goal.id]);
+  if (anchor) {
+    if (!state.oneTimeSchedules || typeof state.oneTimeSchedules !== 'object' || Array.isArray(state.oneTimeSchedules)) state.oneTimeSchedules = {};
+    state.oneTimeSchedules[goal.id] = anchor;
+  } else if (state.oneTimeSchedules) {
+    delete state.oneTimeSchedules[goal.id];
+  }
 }
 
 // CREATE
@@ -2812,6 +2823,7 @@ function createGoal(data) {
   state.goals.push(
     newGoal
   );
+  syncOneTimeSchedule(newGoal);
 
   syncGoalParents();
 
@@ -3024,6 +3036,7 @@ function updateGoal(
   const previous = structuredClone(state);
   const scheduleChanged = JSON.stringify(goal.schedule) !== JSON.stringify(patch.schedule);
   Object.assign(goal, patch);
+  syncOneTimeSchedule(goal, previous.goals.find(item => item.id === id));
   if (scheduleChanged) {
     if (state.reminderReceipts) delete state.reminderReceipts[id];
     delete goal.completedScheduleDay;
@@ -3060,6 +3073,7 @@ function deleteGoal(id) {
   }
 
   if (state.reminderReceipts) delete state.reminderReceipts[id];
+  if (state.oneTimeSchedules) delete state.oneTimeSchedules[id];
   state.goals =
     state.goals.filter(
       (item) =>
@@ -3275,12 +3289,15 @@ function syncGoalTypeUI() {
 function syncGoalScheduleUI() {
   const $ = id => document.getElementById(id);
   const repeating = els.goalRepeat.checked && !els.goalRepeat.disabled;
-  $('goalScheduleFields').hidden = !repeating;
+  $('goalScheduleFields').hidden = els.goalRepeat.disabled;
+  $('goalFrequencyField').hidden = !repeating;
   $('goalDaysField').hidden = !repeating || $('goalFrequency').value === 'daily';
   $('goalTimeControl').dataset.empty = String(!$('goalTime').value);
-  const canRemind = repeating && Boolean($('goalTime').value);
-  $('goalReminder').disabled = !canRemind;
-  if (!canRemind) $('goalReminder').checked = false;
+  const canRemind = !els.goalRepeat.disabled && Boolean($('goalTime').value);
+  // Keep an enabled one-time reminder checked when time is cleared, so the
+  // user can resolve the validation error by adding a time or unchecking it.
+  if (!canRemind && (repeating || els.goalRepeat.disabled)) $('goalReminder').checked = false;
+  $('goalReminder').disabled = !canRemind && !$('goalReminder').checked;
   $('goalReminderHint').hidden = canRemind;
   $('goalReminderOffsetField').hidden = !$('goalReminder').checked;
   $('goalNotificationInfo').hidden = !$('goalReminder').checked ||
@@ -3295,7 +3312,7 @@ function readGoalScheduleForm() {
       type: $('goalFrequency').value,
       time: $('goalTime').value,
       daysOfWeek: [...document.querySelectorAll('[data-schedule-day][aria-pressed="true"]')].map(button => Number(button.dataset.scheduleDay)),
-    } : { type: 'one-time' },
+    } : { type: 'one-time', ...(!els.goalRepeat.disabled ? { time: $('goalTime').value } : {}) },
     reminder: { enabled: $('goalReminder').checked, offset: $('goalReminderOffset').value },
   };
 }
@@ -3305,16 +3322,19 @@ function validateGoalForm() {
   const draft = readGoalScheduleForm();
   const repeating = draft.schedule.type !== 'one-time';
   const daysError = repeating && draft.schedule.type !== 'daily' && !draft.schedule.daysOfWeek.length;
-  const timeError = repeating && ($('goalTime').validity.badInput ||
+  const reminderError = !repeating && draft.reminder.enabled && !draft.schedule.time;
+  const timeError = !els.goalRepeat.disabled && ($('goalTime').validity.badInput ||
     ($('goalTime').value && !GoalSchedule.validTime($('goalTime').value)));
+  $('goalReminderHint').classList.toggle('field-error', reminderError);
+  $('goalReminderHint').hidden = !reminderError && Boolean(draft.schedule.time);
   $('goalDaysError').textContent = daysError ? 'Select at least one day' : '';
   $('goalDaysError').hidden = !daysError;
   $('goalTimeError').textContent = timeError ? 'Please enter a valid time (HH:MM)' : '';
   $('goalTimeError').hidden = !timeError;
   $('goalTime').setAttribute('aria-invalid', String(Boolean(timeError)));
   $('goalTime').setCustomValidity(timeError ? 'Please enter a valid time (HH:MM)' : '');
-  $('goalTime').disabled = !repeating;
-  $('goalSave').disabled = Boolean(daysError || timeError || !els.goalTitle.value.trim() || !els.goalSkill.value);
+  $('goalTime').disabled = els.goalRepeat.disabled;
+  $('goalSave').disabled = Boolean(daysError || timeError || reminderError || !els.goalTitle.value.trim() || !els.goalSkill.value);
   return !$('goalSave').disabled;
 }
 

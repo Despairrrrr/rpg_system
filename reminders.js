@@ -146,9 +146,10 @@ function createBrowserReminders({ getState, navigate, focus = () => window.focus
     return callback();
   }
   async function deliver(entry) {
-    if (permission() !== 'granted' || memory.get(entry.goal.id) === entry.key) return;
+    if (entry.silent || permission() !== 'granted' || memory.get(entry.goal.id) === entry.key) return;
     await exclusive(() => {
-      if (!GoalSchedule.pending(getState()).some(item => item.key === entry.key)) return;
+      const current = GoalSchedule.pending(getState()).find(item => item.key === entry.key);
+      if (!current || current.silent) return;
       let receipts = {};
       try {
         const parsed = JSON.parse(storage.getItem(storageKey));

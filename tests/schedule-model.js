@@ -31,7 +31,16 @@ for (const type of ['weekly', 'custom']) {
   try { Schedule.validate({ type, daysOfWeek: [] }, undefined, 'step'); } catch (error) { rejected = error.message === 'Select at least one day'; }
   assert(rejected, 'empty days rejected');
 }
-assert(!Schedule.validate({ type: 'one-time', time: 'bad' }, { enabled: true }, 'step').reminder, 'one-time ignores hidden fields');
+for (const role of ['step', 'quest']) {
+  assert(!Schedule.validate({ type: 'one-time' }, undefined, role).schedule, 'untimed one-time remains optional');
+  const timed = Schedule.validate({ type: 'one-time', time: '18:00' }, { enabled: true, offset: '5m' }, role);
+  assert(timed.schedule.time === '18:00' && timed.reminder.enabled && !timed.repeatsDaily, 'timed one-time retains fields');
+  for (const [schedule, message] of [[{ type: 'one-time' }, 'Set a time to enable reminders'], [{ type: 'one-time', time: 'bad' }, 'Please enter a valid time (HH:MM)']]) {
+    let error;
+    try { Schedule.validate(schedule, { enabled: true, offset: '5m' }, role); } catch (caught) { error = caught.message; }
+    assert(error === message, 'one-time validation: ' + message);
+  }
+}
 for (const offset of Schedule.offsets) assert(Schedule.validate({ type: 'daily', time: '18:30' }, { enabled: true, offset }, 'step').reminder.offset === offset, 'valid offset');
 
 const weeklyGoal = { type: 'step', completed: true, completedDay: '2026-10-05', schedule: { type: 'weekly', daysOfWeek: [1, 3, 5] } };
@@ -52,3 +61,35 @@ const spring = Schedule.latestDue(dst, new Date(2026, 2, 8, 4));
 assert(spring.day === '2026-03-08' && spring.scheduledAt === new Date(2026, 2, 8, 2, 30).getTime(), 'DST gap follows local calendar normalization');
 const autumn = { ...dst, schedule: { type: 'daily', time: '01:30' } };
 assert(Schedule.latestDue(autumn, new Date(2026, 10, 1, 1, 45)).key === Schedule.latestDue(autumn, new Date(2026, 10, 1, 2, 45)).key, 'DST repeated hour shares one occurrence');
+
+const one = { id: 'once', type: 'step', createdAt: '2026-10-01T08:00:00', schedule: { type: 'one-time', time: '18:00' }, reminder: { enabled: true, offset: '5m' } };
+const configured = new Date(2026, 9, 9, 15);
+const anchor = Schedule.oneTimeAnchor(one, { ...one, schedule: undefined }, null, configured);
+assert(anchor.day === '2026-10-09', 'adding time to an old Goal anchors today');
+assert(!Schedule.latestDue(one, new Date(2026, 9, 9, 17, 54), anchor), 'one-time not due early');
+const onceEntry = Schedule.latestDue(one, new Date(2026, 9, 9, 17, 55), anchor);
+assert(onceEntry && !onceEntry.silent && !onceEntry.missed, 'one-time fires at offset');
+assert(Schedule.latestDue(one, new Date(2026, 9, 9, 18, 0, 30), anchor).silent === false, 'normal minute polling may deliver slightly after scheduled time');
+assert(Schedule.latestDue(one, new Date(2026, 9, 12, 18), anchor).key === onceEntry.key, 'one-time never becomes a new daily occurrence');
+const past = { ...one, schedule: { type: 'one-time', time: '10:00' } };
+const pastEntry = Schedule.latestDue(past, configured, anchor);
+assert(pastEntry.missed && pastEntry.silent, 'past time is missed without immediate system notification');
+assert(!Schedule.latestDue({ ...one, completed: true }, new Date(2026, 9, 10, 19), anchor), 'completed one-time never reminds again');
+assert(!Schedule.shouldReset({ ...one, completed: true, completedDay: '2026-10-09' }, new Date(2026, 9, 12)), 'one-time completion never resets');
+assert(Schedule.oneTimeAnchor(one, one, anchor, new Date(2026, 9, 12)).day === anchor.day, 'unrelated edits preserve assigned date');
+assert(Schedule.oneTimeAnchor(past, one, anchor, new Date(2026, 9, 12)).day === '2026-10-12', 'changing time assigns a new local date');
+assert(!Schedule.oneTimeAnchor({ ...one, schedule: undefined }, one, anchor), 'removing time clears anchor');
+const pendingOnce = { goals: [one], completionHistory: [], oneTimeSchedules: { once: anchor }, reminderReceipts: {} };
+pendingOnce.reminderReceipts.once = { key: onceEntry.key, status: 'skipped' };
+assert(!Schedule.pending(pendingOnce, new Date(2026, 9, 12, 18)).length, 'skipped one-time stays skipped after midnight');
+for (const offset of Schedule.offsets) {
+  const at = new Date(2026, 9, 9, 18); at.setMinutes(at.getMinutes() - parseInt(offset, 10));
+  assert(Schedule.latestDue({ ...one, reminder: { enabled: true, offset } }, at, anchor)?.day === anchor.day, 'one-time offset ' + offset);
+}
+assert(Schedule.label(one) === 'One-time · 18:00', 'timed one-time label has no recurrence marker');
+
+for (const time of [null, false, 0, 'bad']) {
+  let failed = false;
+  try { Schedule.validate({ type: 'one-time', time }, undefined, 'step'); } catch (_) { failed = true; }
+  assert(failed, 'malformed optional one-time time rejected');
+}

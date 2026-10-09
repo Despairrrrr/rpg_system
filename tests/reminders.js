@@ -66,6 +66,18 @@ async function run() {
   browserFactory(options).refresh(entries);
   for (let i = 0; i < 5; i++) await Promise.resolve();
   assert(sent.length === 1, 'delivery survives controller reload');
+  const actualNow = new Date();
+  const oneTime = { ...liveGoal, id: 'silent-one-time', schedule: { type: 'one-time', time: '00:00' } };
+  state = { goals: [oneTime], completionHistory: [], oneTimeSchedules: { [oneTime.id]: { day: GoalSchedule.dayKey(actualNow), configuredAt: actualNow.getTime() } } };
+  const missedEntries = GoalSchedule.pending(state);
+  assert(missedEntries.length === 1 && missedEntries[0].silent, 'past one-time visible in panel');
+  const countBeforeSilent = sent.length;
+  browserFactory(options).refresh(missedEntries);
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+  assert(sent.length === countBeforeSilent, 'past-created one-time does not generate a system notification');
+  oneTime.completed = true;
+  assert(GoalSchedule.pending(state).length === 0, 'one-time completion cancels pending notification');
+  state = { goals: [liveGoal], completionHistory: [], streak: { count: 3 } };
   FakeNotification.permission = 'denied';
   assert(await browserFactory(options).requestPermission() === 'denied' && requestCount === 1, 'denial never re-prompts');
   assert(GoalSchedule.pending(state).length === 1, 'denial leaves in-app entry intact');

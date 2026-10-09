@@ -7,7 +7,7 @@ const GoalSchedule = (() => {
   function read(goal) {
     const value = goal?.schedule;
     if (!value || !types.includes(value.type)) return null;
-    if (value.type === 'one-time') return { type: 'one-time' };
+    if (value.type === 'one-time' && (value.time === undefined || value.time === '')) return { type: 'one-time' };
     if (!['step', 'quest'].includes(goal.type)) return null;
     if (value.time !== undefined && value.time !== '' && !validTime(value.time)) return null;
     const schedule = { type: value.type };
@@ -29,9 +29,16 @@ const GoalSchedule = (() => {
   }
 
   function validate(schedule, reminderValue, role) {
-    if (!schedule || schedule.type === 'one-time') return { schedule: undefined, reminder: undefined, repeatsDaily: false };
+    if (!schedule) {
+      if (reminderValue?.enabled) throw new Error('Set a time to enable reminders');
+      return { schedule: undefined, reminder: undefined, repeatsDaily: false };
+    }
+    if (schedule.type === 'one-time' && (schedule.time === undefined || schedule.time === '')) {
+      if (reminderValue?.enabled) throw new Error('Set a time to enable reminders');
+      return { schedule: undefined, reminder: undefined, repeatsDaily: false };
+    }
     if (!types.includes(schedule.type)) throw new Error('Choose a valid frequency.');
-    if (!['step', 'quest'].includes(role)) throw new Error('Only Steps and Quests can repeat.');
+    if (!['step', 'quest'].includes(role)) throw new Error(schedule.type === 'one-time' ? 'Only Steps and Quests can have a scheduled time.' : 'Only Steps and Quests can repeat.');
     if (['weekly', 'custom'].includes(schedule.type) &&
         (!Array.isArray(schedule.daysOfWeek) || !schedule.daysOfWeek.length)) throw new Error('Select at least one day');
     if (schedule.time !== undefined && schedule.time !== '' && !validTime(schedule.time)) throw new Error('Please enter a valid time (HH:MM)');
@@ -51,6 +58,32 @@ const GoalSchedule = (() => {
 
   function dayKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function validAnchor(value) {
+    if (!value || typeof value.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.day) ||
+        !Number.isFinite(value.configuredAt)) return false;
+    const [year, month, day] = value.day.split('-').map(Number);
+    return dayKey(new Date(year, month - 1, day, 12)) === value.day;
+  }
+
+  function creationAnchor(goal) {
+    const created = new Date(goal.createdAt);
+    return Number.isFinite(created.getTime()) ? { day: dayKey(created), configuredAt: created.getTime() } : null;
+  }
+
+  // Keep the public Goal.schedule shape unchanged. The caller stores this
+  // local calendar anchor in optional state.oneTimeSchedules[goal.id].
+  function oneTimeAnchor(goal, previous, stored, now = new Date()) {
+    const schedule = read(goal);
+    if (schedule?.type !== 'one-time' || !schedule.time) return null;
+    const before = read(previous);
+    if (before?.type === 'one-time' && before.time === schedule.time) {
+      const anchor = validAnchor(stored) ? stored : creationAnchor(goal);
+      if (anchor) return !reminder(previous).enabled && reminder(goal).enabled
+        ? { ...anchor, configuredAt: now.getTime() } : anchor;
+    }
+    return { day: dayKey(now), configuredAt: now.getTime() };
   }
 
   function occursOn(schedule, date) {
@@ -77,7 +110,8 @@ const GoalSchedule = (() => {
 
   function label(goal) {
     const schedule = effective(goal);
-    if (!schedule || schedule.type === 'one-time') return '';
+    if (!schedule) return '';
+    if (schedule.type === 'one-time') return schedule.time ? `One-time · ${schedule.time}` : '';
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const frequency = schedule.type === 'daily' ? 'Daily' :
       `${schedule.type === 'weekly' ? 'Weekly' : 'Custom'} · ${schedule.daysOfWeek.map(day => days[day - 1]).join(', ')}`;
@@ -86,11 +120,22 @@ const GoalSchedule = (() => {
 
   // One latest due occurrence per goal. Check tomorrow too: a reminder for
   // 00:05 may be due at 23:35 on the preceding local day.
-  function latestDue(goal, now = new Date()) {
+  function latestDue(goal, now = new Date(), oneTimeSchedule = null) {
     const schedule = read(goal);
     const configured = reminder(goal);
-    if (!schedule?.time || schedule.type === 'one-time' || !configured.enabled) return null;
+    if (!schedule?.time || !configured.enabled) return null;
     const [hours, minutes] = schedule.time.split(':').map(Number);
+    if (schedule.type === 'one-time') {
+      const anchor = validAnchor(oneTimeSchedule) ? oneTimeSchedule : creationAnchor(goal);
+      if (!anchor || goal.completed) return null;
+      const [year, month, day] = anchor.day.split('-').map(Number);
+      const scheduledAt = new Date(year, month - 1, day, hours, minutes).getTime();
+      const dueAt = scheduledAt - parseInt(configured.offset, 10) * 60_000;
+      if (now.getTime() < dueAt) return null;
+      return { key: `${goal.id}/one-time/${schedule.time}/${anchor.day}`, goal,
+        day: anchor.day, time: schedule.time, scheduledAt, dueAt,
+        missed: now.getTime() > scheduledAt, silent: anchor.configuredAt > scheduledAt };
+    }
     const created = new Date(goal.createdAt);
     const createdDay = Number.isFinite(created.getTime()) ? dayKey(created) : '';
     for (let offset = 1; offset >= -7; offset--) {
@@ -108,7 +153,7 @@ const GoalSchedule = (() => {
 
   function pending(state, now = new Date()) {
     return (state.goals || []).flatMap(goal => {
-      const entry = latestDue(goal, now);
+      const entry = latestDue(goal, now, state.oneTimeSchedules?.[goal.id]);
       if (!entry || (goal.completed && !shouldReset(goal, now))) return [];
       const receipt = state.reminderReceipts?.[goal.id];
       if (receipt?.key === entry.key && ['done', 'skipped'].includes(receipt.status)) return [];
@@ -120,5 +165,5 @@ const GoalSchedule = (() => {
     }).sort((a, b) => b.scheduledAt - a.scheduledAt || a.key.localeCompare(b.key));
   }
 
-  return { types, offsets, validTime, read, reminder, validate, effective, dayKey, occursOn, shouldReset, label, latestDue, pending };
+  return { types, offsets, validTime, read, reminder, validate, effective, dayKey, oneTimeAnchor, occursOn, shouldReset, label, latestDue, pending };
 })();

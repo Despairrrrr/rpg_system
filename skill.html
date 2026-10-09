@@ -134,8 +134,8 @@
           <label><input type="radio" name="scheduleMode" id="goalOneTime" value="one-time" checked /> One-time</label>
           <label><input type="radio" name="scheduleMode" id="goalRepeat" value="repeating" /> Repeating</label>
         </div>
-        <div id="goalScheduleFields" hidden>
-          <label>Frequency
+        <div id="goalScheduleFields">
+          <label id="goalFrequencyField" hidden>Frequency
             <select id="goalFrequency">
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
@@ -166,7 +166,7 @@
       <fieldset class="goal-schedule">
         <legend>Reminder</legend>
         <label class="schedule-check"><input type="checkbox" id="goalReminder" disabled /> Send notification</label>
-        <p class="field-hint" id="goalReminderHint">Choose a repeating schedule and time to enable reminders.</p>
+        <p class="field-hint" id="goalReminderHint" role="status">Set a time to enable reminders</p>
         <label id="goalReminderOffsetField" hidden>Notify me
           <select id="goalReminderOffset">
             <option value="0m">At time</option>
@@ -279,8 +279,8 @@
   <script src="firebase.init.js?v=2"></script>
   <script src="statistics-model.js?v=1"></script>
   <script src="statistics.js?v=5"></script>
-  <script src="schedule-model.js?v=1"></script>
-  <script src="reminders.js?v=1"></script>
-  <script src="app.js?v=14"></script>
+  <script src="schedule-model.js?v=2"></script>
+  <script src="reminders.js?v=2"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

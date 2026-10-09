@@ -91,7 +91,8 @@ creates the Firebase user, later ones just sign it in.
   under a quest or an arc, a quest may sit under an arc, and every parent is optional.
 - Recurrence is independent of size: Steps and Quests can repeat daily, weekly or on
   custom weekdays, with an optional local time. The default One-time mode has no
-  scheduling fields. Cards show frequency, days and time (or Any time). The old four types
+  frequency/day fields; Steps and Quests still show optional Time. Cards show
+  frequency, days and time (or Any time). The old four types
   (`daily` / `short` / `medium` / `long`) are migrated on load: `daily` becomes a repeating step,
   `short` a step, `medium` a quest and `long` an arc, keeping titles, XP, completion and streaks.
 - Exponential level/XP curve (reaching level N requires (N-1)^2 * 100 XP).
@@ -224,15 +225,26 @@ behavior remain unchanged.
 
 Choose Repeating in Add/Edit Goal, then Daily, Weekly or Custom days. Weekly and
 Custom both repeat on the selected weekdays; select at least one. Arcs remain
-One-time. Time is optional and stored as local `HH:MM`, without UTC conversion.
+One-time with no time/reminder controls. One-time Steps and Quests show optional
+Time using the same picker as repeating Goals. Time is stored as local `HH:MM`,
+without UTC conversion.
 Existing daily Goals migrate automatically, retain their XP/history, and have
 reminders disabled until you enable them. `repeatsDaily` remains in saved data.
 
-Send notification becomes available when a repeating Goal has a time. Choose At
+Send notification becomes available when a Step or Quest has a time, including
+One-time Goals. Choose At
 time or 5, 15 or 30 minutes before (default 5). The bell lists the latest due
 occurrence per Goal, including a Missed label after its scheduled time. Mark done
 awards the ordinary reward and records completion today; Skip dismisses just that
-occurrence without XP. Both survive reloads. Removing a schedule clears its reminder.
+occurrence without XP. Both survive reloads. To remove time from a One-time Goal,
+turn off Send notification as well; otherwise Save is disabled with “Set a time to
+enable reminders”. Switching between One-time and Repeating preserves the entered time.
+
+A One-time time belongs to the local date when you set or change it, including when
+adding time to an old Goal. Editing only the title or reminder offset preserves that
+date. A time already past when configured appears as Missed in the panel without
+an immediate system notification. Completing the Goal before its time cancels the
+reminder; completion and Skip never produce another reminder the next day.
 
 Reminders are checked every minute while the app is open and when the page resumes.
 Suspended tabs may deliver late; closed tabs do not notify. Browser notifications

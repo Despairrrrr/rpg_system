@@ -9,6 +9,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Surface | Accepted behavior | Implementation |
 |---|---|---|
 | Top navigation | **Goals** and **Statistics** only; no Skills tab | `index.html`, navigation handler in `app.js` |
+| Goal scheduling | Step/Quest One-time and Repeating both show optional Time; only Repeating shows frequency/days. Reminders require a time | `index.html`, `skill.html`, `app.js`, `schedule-model.js` |
 | Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
 | Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
 | Dashboard Goals | One **…** menu containing Edit and Delete | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
@@ -647,6 +648,8 @@ STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py w
 STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit 390 844
 GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit
 GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=schedule-browser.js python3 tests/statistics-browser.py webkit 390 844
+STATISTICS_TEST_SCRIPT=one-time-browser.js python3 tests/statistics-browser.py webkit
+GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=one-time-browser.js python3 tests/statistics-browser.py webkit 390 844
 ```
 
 The JavaScript tests also support Node. The browser runner accepts a Chromium executable
@@ -720,9 +723,13 @@ Browser check: `STATISTICS_TEST_SCRIPT=goals-ui-browser.js python3 tests/statist
 `Goal.schedule` is optional: `{ type: "one-time" | "daily" | "weekly" | "custom",
 time?: "HH:MM", daysOfWeek?: number[] }`. Weekdays are 1=Monday through 7=Sunday.
 `Goal.reminder` is optional: `{ enabled: boolean, offset: "0m" | "5m" | "15m" | "30m" }`.
-The form omits both fields for One-time. Daily writes `repeatsDaily: true`;
+The form omits both fields for untimed One-time Goals. Timed One-time Steps/Quests
+retain `{ type: "one-time", time: "HH:MM" }` and optional reminder settings, with
+`repeatsDaily: false`. Daily writes `repeatsDaily: true`;
 weekly/custom write `false`. Step/Quest can repeat, Arc cannot. Weekly and Custom
 both use a nonempty selected-day set. Untimed schedules are valid but cannot notify.
+One-time reminders left enabled without a time fail validation with “Set a time to
+enable reminders”; this is checked both in the form and before a state write.
 
 `GoalSchedule.validate()` rejects invalid new values before state mutation, and
 `GoalSchedule.read()` safely ignores malformed persisted optional data. Legacy daily
@@ -730,6 +737,22 @@ behavior remains the fallback. After existing type conversion, `migrateGoalSched
 adds `{ type: "daily" }` and `{ enabled: false, offset: "0m" }` only to Goals whose
 `repeatsDaily === true` and schedule is absent. It runs for local and cloud reads,
 preserves existing schedules, and does not change `updatedAt`, XP or history.
+
+Optional `state.oneTimeSchedules` stores `{ day: "YYYY-MM-DD", configuredAt: number }`
+per timed one-time Goal. This leaves the public Goal/schedule shape unchanged. The
+anchor is created/changed on time assignment, including when adding time to an old
+Goal. Other edits preserve the date; enabling a reminder updates `configuredAt`
+without moving that date. Removal, switching to repeating and deletion clear it.
+It travels with ordinary local/cloud state writes and rolls back on save failure.
+Imported timed one-time Goals without this metadata fall back to their valid
+`createdAt`; a missing/invalid anchor and creation date produce no reminder.
+
+One-time occurrences keep the same key after midnight. Past times configured after
+the scheduled instant have `silent: true`: they appear as Missed in-app but cannot
+produce an immediate system notification, including after reload. Normal minute
+polling can still deliver a reminder configured ahead of time just after its due
+instant. Completion (including before the deadline) removes the pending occurrence;
+Skip dismisses the sole occurrence permanently unless the schedule is changed.
 
 `GoalSchedule.shouldReset()` preserves the legacy local-day reset for daily Goals;
 weekly/custom reopen on the next selected day, including after suspended tabs.

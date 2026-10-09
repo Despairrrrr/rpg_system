@@ -34,11 +34,14 @@ async function run() {
   assert(JSON.parse(localStorage.saved).updatedAt === 20, 'cloud timestamp is preserved locally');
   state.goals.push({ id: 'scheduled', type: 'step', repeatsDaily: false, skillId: 's', title: 'Weekly', schedule: { type: 'weekly', time: '07:00', daysOfWeek: [1,3,5] }, reminder: { enabled: true, offset: '15m' } });
   state.reminderReceipts = { scheduled: { key: 'occurrence', status: 'skipped' } };
+  state.goals.push({ id: 'once', type: 'quest', skillId: 's', title: 'Once', schedule: { type: 'one-time', time: '18:00' }, reminder: { enabled: true, offset: '5m' } });
+  state.oneTimeSchedules = { once: { day: '2026-10-09', configuredAt: 1791540000000 } };
   state.completionHistory.push({ id: 'r', goalId: 'g', skillId: 's', completionDate: Statistics.dayKey(), xpAwarded: 10 });
   Statistics.createArea(state, 'a', 'Learning', ['s']);
   api.saveState();
   await api.pushToCloud();
   const sent = JSON.parse(writes[writes.length - 1].state);
+  assert(sent.goals[1].schedule.time === '18:00' && sent.oneTimeSchedules.once.day === '2026-10-09', 'one-time schedule and local date cloud round-trip');
   assert(sent.goals[0].schedule.time === '07:00' && sent.goals[0].reminder.offset === '15m' && sent.reminderReceipts.scheduled.status === 'skipped', 'schedule, reminder and receipt cloud round-trip');
   assert(sent.completionHistory.length === 1 && sent.lifeAreas.length === 1 && sent.skills[0].lifeAreaId === 'a', 'cloud round-trip includes facts and relationships');
   assert(writes[writes.length - 1].updatedAt === state.updatedAt, 'cloud envelope uses actual edit timestamp');

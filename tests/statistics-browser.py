@@ -73,6 +73,8 @@ if sys.argv[1] == 'webkit':
     for key in ['LD_LIBRARY_PATH', 'GTK_PATH', 'GTK_EXE_PREFIX', 'GTK_MODULES', 'GIO_EXTRA_MODULES', 'GIO_MODULE_DIR']:
         os.environ.pop(key, None)
     os.environ['WEBKIT_DISABLE_COMPOSITING_MODE'] = '1'
+    os.environ['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
+    os.environ['LIBGL_ALWAYS_SOFTWARE'] = '1'
     import gi
     gi.require_version('Gtk', '3.0')
     gi.require_version('WebKit2', '4.1')

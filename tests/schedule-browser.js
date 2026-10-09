@@ -5,7 +5,7 @@
   const result = document.createElement('pre'); result.id = 'test-result';
   try {
     openGoalModal(null, 'step', 'math');
-    assert($('goalOneTime').checked && $('goalScheduleFields').hidden, 'one-time default hides fields');
+    assert($('goalOneTime').checked && !$('goalScheduleFields').hidden && $('goalFrequencyField').hidden && !$('goalTime').disabled, 'one-time shows optional time without frequency');
     $('goalRepeat').click();
     assert(!$('goalScheduleFields').hidden && $('goalDaysField').hidden, 'daily mode displays time and frequency');
     change('goalFrequency', 'weekly');
@@ -15,7 +15,8 @@
     change('goalFrequency', 'custom');
     assert(!$('goalDaysField').hidden, 'custom displays days');
     $('goalOneTime').click();
-    assert($('goalScheduleFields').hidden, 'one-time hides all schedule inputs');
+    assert(!$('goalScheduleFields').hidden && $('goalFrequencyField').hidden && $('goalDaysField').hidden, 'one-time hides frequency and days but keeps time');
+    assert($('goalReminder').disabled && $('goalReminderHint').textContent === 'Set a time to enable reminders', 'untimed one-time reminder helper');
     $('goalModal').querySelector('[data-close="goalModal"]').click();
     assert(!$('goalModal').open && state.goals.length === 0, 'cancel saves nothing');
     openGoalModal(null, 'arc', 'math');
@@ -57,8 +58,25 @@
     assert(weekly.schedule.time === '07:00', 'cancel edit leaves data intact');
     openGoalModal(weekly);
     $('goalOneTime').click();
+    change('goalTime', '');
+    assert($('goalSave').disabled && $('goalReminderHint').textContent === 'Set a time to enable reminders', 'one-time reminder without time blocks save');
+    $('goalReminder').click();
     $('goalForm').requestSubmit();
     assert(!weekly.schedule && !weekly.reminder && !weekly.repeatsDaily, 'removing schedule clears reminders');
+    for (const role of ['step', 'quest']) {
+      openGoalModal(null, role, 'math'); change('goalTitle', 'One-time ' + role); change('goalTime', '18:00');
+      $('goalForm').requestSubmit();
+      const oneTime = state.goals[state.goals.length - 1];
+      assert(oneTime.schedule.type === 'one-time' && oneTime.schedule.time === '18:00' && !oneTime.reminder.enabled, 'one-time time without reminder');
+      openGoalModal(oneTime); $('goalReminder').click(); $('goalForm').requestSubmit();
+      assert(oneTime.reminder.enabled && oneTime.reminder.offset === '5m', 'one-time reminder persisted');
+      openGoalModal(oneTime);
+      assert($('goalTime').value === '18:00' && $('goalReminder').checked && $('goalFrequencyField').hidden, 'one-time edit restores fields');
+      change('goalTime', '');
+      assert($('goalSave').disabled && !$('goalReminder').disabled, 'missing time blocks save but allows turning reminder off');
+      $('goalReminder').click(); $('goalForm').requestSubmit();
+      assert(!oneTime.schedule && !oneTime.reminder, 'removing one-time time cancels reminder');
+    }
     const before = state.goals.length;
     assert(!createGoal({ title: 'Invalid', type: 'step', skillId: 'math', xp: 10, schedule: { type: 'daily', time: '25:80' } }), 'invalid time rejected in write path');
     assert(state.goals.length === before && $('goalFormError').textContent === 'Please enter a valid time (HH:MM)', 'invalid input cannot mutate state');
@@ -93,8 +111,8 @@
     const mark = [...$('reminderList').querySelectorAll('[data-action="complete"]')].find(button => button.dataset.key.startsWith(reminderGoal.id + '/'));
     const xpBefore = state.skills[0].xp;
     mark.click();
-    await new Promise(resolve => setTimeout(resolve, 80));
-    assert(reminderGoal.completed && state.skills[0].xp === xpBefore + 10, 'panel Mark done completes and awards XP');
+    for (let i = 0; i < 100 && !reminderGoal.completed; i++) await new Promise(resolve => setTimeout(resolve, 20));
+    assert(reminderGoal.completed && state.skills[0].xp === xpBefore + 10, 'panel Mark done completes and awards XP: ' + JSON.stringify({ done: reminderGoal.completed, xp: state.skills[0].xp, before: xpBefore }));
     reminderSystem.refresh();
     assert(!GoalSchedule.pending(state).some(entry => entry.goal.id === reminderGoal.id), 'completed reminder stays dismissed');
     assert(loadState().reminderReceipts[reminderGoal.id].status === 'done', 'completion receipt persisted');

@@ -86,8 +86,15 @@ them; update the documentation alongside that change.
 
 - One-time is the form default. Weekly/custom require at least one weekday (1=Mon,
   7=Sun). Time is an optional local `HH:MM` string; untimed schedules show Any time.
-  Reminders require a repeating schedule with a valid time. Removing the schedule
-  clears reminder settings. Cancel never writes draft values.
+  Step/Quest One-time Goals also show optional Time and support reminders when time
+  is set. A checked one-time reminder with no time blocks saving. Removing time
+  requires turning the reminder off; saving clears its settings. Cancel never writes
+  draft values. Arcs have no time or reminders.
+- One-time times apply to the local date on which time is assigned/changed, stored
+  in optional state.oneTimeSchedules without changing the Goal schedule shape.
+  Ordinary edits preserve that date. Past times configured after their deadline
+  appear as Missed in-app without a system notification. Completed one-time Goals
+  never reset or remind again; Skip dismisses their sole occurrence.
 - Migrate legacy `repeatsDaily: true` Goals with no schedule to `{ type: "daily" }`
   and `{ enabled: false, offset: "0m" }`, after legacy type migration. Preserve all
   facts and edit timestamps. Invalid optional scheduling data uses legacy behavior.
