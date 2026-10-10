@@ -46,14 +46,17 @@
     assert(deleteRequested && state.goals.includes(goal), 'Skill goal menu invokes deletion confirmation');
     tree.remove();
     toggleGoalCompletion(goal.id, true);
+    assert(state.completionHistory[0].goalType === 'step', 'completion snapshots goal type');
     assert(firstSkill.xp === 130 && state.completionHistory.length === 1, 'completion awards XP and records once');
     toggleGoalCompletion(goal.id, true);
     assert(firstSkill.xp === 130 && state.completionHistory.length === 1, 'duplicate completion ignored');
-    updateGoal(goal.id, { xp: 125, skillId: secondSkill.id });
+    updateGoal(goal.id, { xp: 125, skillId: secondSkill.id, type: 'quest' });
+    assert(state.completionHistory[0].goalType === 'step', 'editing type preserves historical snapshot');
     toggleGoalCompletion(goal.id, false);
     assert(firstSkill.xp === 100 && secondSkill.xp === 0 && state.completionHistory.length === 0, 'undo reverses original reward and Skill after editing');
     toggleGoalCompletion(goal.id, true);
     assert(secondSkill.xp === 125 && state.completionHistory.length === 1, 'new completion uses edited reward');
+    assert(state.completionHistory[0].goalType === 'quest', 'next completion snapshots edited type');
     const oldRecord = state.completionHistory[0];
     oldRecord.completionDate = Statistics.shiftDay(getDayKey(), -1);
     goal.completedDay = oldRecord.completionDate;

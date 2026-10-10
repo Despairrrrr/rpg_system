@@ -218,7 +218,7 @@ assert(JSON.stringify(rewards.slice().sort((a, b) => a - b)) === JSON.stringify(
 // 19, 20, 21. XP, COMPLETION, STREAK
 // ===============================
 
-// These three read the goal, never its type, so the new model cannot
+// Reward logic ignores type; history may snapshot it so the new model cannot
 // change how they behave. Asserted on the source, because the reward
 // path is DOM-driven.
 function section(source, start, end) {
@@ -228,7 +228,7 @@ function section(source, start, end) {
   return source.slice(from, to === -1 ? source.length : to);
 }
 const completion = section(app, 'function toggleGoalCompletion(', '\n// UPDATE');
-assert(!/goal\.type|"daily"|"short"|"medium"|"long"|repeatsDaily/.test(completion), '19, 20: completion and XP must not depend on the goal type');
+assert(!/goal\.type|"daily"|"short"|"medium"|"long"|repeatsDaily/.test(completion.replace('goalType: goal.type', '')), '19, 20: completion and XP must not depend on the goal type');
 const streak = section(app, 'function bumpStreak(', 'function checkStreakExpiry');
 assert(!/goal\.type|repeatsDaily|"daily"/.test(streak), '21: streak rules must not depend on the goal type');
 const chip = section(app, 'function getGoalStateLabel', 'function renderGoalRepeat');

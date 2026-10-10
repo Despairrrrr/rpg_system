@@ -37,12 +37,18 @@ const Statistics = (() => {
   }
   function weekly(state, start) {
     const end = shiftDay(start, 7);
-    const days = Array.from({ length: 7 }, (_, index) => ({ date: shiftDay(start, index), count: 0 }));
+    const days = Array.from({ length: 7 }, (_, index) => ({ date: shiftDay(start, index), count: 0, types: { step: 0, quest: 0, arc: 0, unclassified: 0 } }));
     const counts = new Map(days.map(day => [day.date, day]));
     const totals = new Map();
+    let earned = 0;
     for (const record of state.completionHistory) {
       if (!validDay(record.completionDate) || record.completionDate < start || record.completionDate >= end) continue;
-      counts.get(record.completionDate).count++;
+      const day = counts.get(record.completionDate);
+      day.count++;
+      // Current Goals are editable/deletable; only a completion-time snapshot is reliable.
+      const type = ['step', 'quest', 'arc'].includes(record.goalType) ? record.goalType : 'unclassified';
+      day.types[type]++;
+      earned += Math.max(0, Number(record.xpAwarded) || 0);
       totals.set(record.skillId, (totals.get(record.skillId) || 0) + Math.max(0, Number(record.xpAwarded) || 0));
     }
     const skills = state.skills.map(skill => ({ ...skill, earned: totals.get(skill.id) || 0 }))
@@ -56,7 +62,7 @@ const Statistics = (() => {
     }
     const categorizedXp = areas.reduce((sum, area) => sum + area.earned, 0);
     for (const area of areas) area.percentage = categorizedXp ? area.earned / categorizedXp * 100 : 0;
-    return { days, skills, areas, categorizedXp };
+    return { days, skills, areas, categorizedXp, earned };
   }
   // Validate before mutating, so a failed creation never leaves an empty Area.
   function createArea(state, id, name, skillIds) {

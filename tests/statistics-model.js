@@ -55,3 +55,23 @@ assert(empty.categorizedXp === 0 && empty.areas.every(area => area.percentage ==
 const reloaded = model.normalize(JSON.parse(JSON.stringify(state)));
 assert(JSON.stringify(reloaded) === JSON.stringify(state), 'new fields survive JSON round-trip');
 (typeof print === 'function' ? print : console.log)('PASS: migration, coverage, local weeks/DST, activity, weekly XP, focus shares, Area validation, assignments and persistence');
+
+const typed = model.normalize({ skills: [{id: 's', name: 'Skill', xp: 999}],
+  goals: [{id: 'recurring', type: 'arc', xp: 999}],
+  completionHistory: [
+    ['recurring', 'step', 10, 0], ['recurring', 'step', 20, 1],
+    ['deleted', 'quest', 30, 0], ['deleted', 'arc', 40, 0],
+    ['recurring', undefined, 50, 0], ['deleted', 'invalid', 60, 0],
+  ].map(([goalId, goalType, xpAwarded, offset], id) => ({id, goalId, goalType,
+    skillId: id === 5 ? 'missing' : 's', xpAwarded, completionDate: model.shiftDay('2026-10-05', offset)})),
+}, '2026-10-05');
+const facts = JSON.stringify(typed);
+const typedWeek = model.weekly(typed, '2026-10-05');
+assert(JSON.stringify(typedWeek.days[0].types) === JSON.stringify({step:1,quest:1,arc:1,unclassified:2}), 'snapshot types survive edits/deletion; legacy and invalid types stay explicit');
+assert(typedWeek.days[1].types.step === 1 && typedWeek.days.reduce((n,d)=>n+d.count,0) === 6, 'recurring events count separately');
+assert(typedWeek.earned === 210, 'summary sums recorded XP, including absent Skills');
+assert(typedWeek.days.every(d=>Object.values(d.types).reduce((a,b)=>a+b,0) === d.count), 'stacks reconcile with daily totals');
+assert(JSON.stringify(typed) === facts, 'aggregation never mutates facts');
+typed.completionHistory.splice(1,1);
+assert(model.weekly(typed,'2026-10-05').earned === 190 && model.weekly(typed,'2026-10-05').days[1].count === 0, 'removed completion reverses aggregates');
+(typeof print === 'function' ? print : console.log)('PASS: historical type snapshots, unclassified events, recurring stacks, recorded XP and removed events');

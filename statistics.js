@@ -34,10 +34,12 @@ function createStatisticsView({ getState, save }) {
     const track = node.parentElement.getBoundingClientRect()[dimension];
     return track ? node.getBoundingClientRect()[dimension] / track * 100 : 0;
   }
+  const activityTypes = [['step', 'Steps'], ['quest', 'Quests'], ['arc', 'Arcs'], ['unclassified', 'Unclassified']];
   function geometry() {
     const polygon = $('areaRadar').querySelector('.radar-value');
     return {
       bars: [...$('activityChart').querySelectorAll('.activity-bar')].map(node => sampleBar(node, 'height')),
+      segments: [...$('activityChart').querySelectorAll('.activity-bar')].map(bar => [...bar.children].map(node => sampleBar(node, 'height'))),
       skills: new Map([...$('skillProgression').children].map(row => [row.dataset.skillId, sampleBar(row.querySelector('.progression-bar'), 'width')])),
       areas: new Map([...$('areaBreakdown').children].map(row => [row.dataset.areaId, sampleBar(row.querySelector('.progression-bar'), 'width')])),
       radar: polygon ? { ids: polygon.dataset.ids, points: polygon.getAttribute('points').split(' ').map(pair => pair.split(',').map(Number)) } : null,
@@ -129,7 +131,7 @@ function createStatisticsView({ getState, save }) {
     const end = Statistics.shiftDay(selectedWeek, 6);
     const stats = Statistics.weekly(state, selectedWeek);
     const visible = !page.hidden;
-    const signature = JSON.stringify([selectedWeek, state.statisticsStartedOn, motion.matches, stats.days,
+    const signature = JSON.stringify([selectedWeek, state.statisticsStartedOn, motion.matches, stats.days, stats.earned,
       stats.skills.map(({ id, name, earned }) => [id, name, earned]), stats.areas]);
     if (signature === lastData && visible === wasVisible) return;
     const entering = visible && !wasVisible;
@@ -141,7 +143,7 @@ function createStatisticsView({ getState, save }) {
     const changes = [];
     const untracked = end < state.statisticsStartedOn;
     const total = stats.days.reduce((sum, day) => sum + day.count, 0);
-    const earned = stats.skills.reduce((sum, skill) => sum + skill.earned, 0);
+    const earned = stats.earned;
     $('selectedWeek').textContent = `${shortDate(selectedWeek)} – ${fullDate(end)}`;
     $('nextWeek').disabled = selectedWeek >= currentWeek;
     $('weekSummary').hidden = untracked;
@@ -153,6 +155,15 @@ function createStatisticsView({ getState, save }) {
       : selectedWeek <= state.statisticsStartedOn ? `Tracking started on ${fullDate(state.statisticsStartedOn)}. This week's totals cover recorded activity only.` : '';
     $('statisticsCoverage').hidden = !$('statisticsCoverage').textContent;
     $('weeklyGoalCount').textContent = untracked ? 'No history' : `${number(total)} ${total === 1 ? 'goal' : 'goals'}`;
+    $('activityLegend').replaceChildren();
+    const hasUnclassified = stats.days.some(day => day.types.unclassified > 0);
+    for (const [type, label] of activityTypes) {
+      if (type === 'unclassified' && !hasUnclassified) continue;
+      const item = element('span', 'activity-legend-item', label);
+      item.prepend(element('i', `activity-swatch activity-${type}`));
+      $('activityLegend').append(item);
+    }
+    $('activityClassification').hidden = !hasUnclassified;
     $('activityChart').replaceChildren();
     $('activityScale').replaceChildren();
     // A readable integer axis is presentation only; completion counts stay unchanged.
@@ -162,9 +173,32 @@ function createStatisticsView({ getState, save }) {
     stats.days.forEach((day, index) => {
       const unavailable = day.date < state.statisticsStartedOn;
       const column = element('div', 'activity-day');
-      column.setAttribute('aria-label', `${fullDate(day.date)}: ${unavailable ? 'not tracked' : `${day.count} goals completed`}`);
+      const detail = `${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][index]}, ${fullDate(day.date)}\n${unavailable ? 'Not tracked' : activityTypes.map(([type, label]) => `${label}: ${number(day.types[type])}`).join('\n') + `\nTotal completions: ${number(day.count)}`}`;
+      column.tabIndex = 0;
+      column.setAttribute('role', 'group');
+      column.setAttribute('aria-label', detail);
+      const tooltip = element('div', 'activity-tooltip', detail);
+      tooltip.setAttribute('role', 'tooltip');
+      tooltip.id = `activity-tooltip-${index}`;
+      column.setAttribute('aria-describedby', tooltip.id);
+      column.append(tooltip);
+      column.addEventListener('focus', () => column.classList.add('has-focus'));
+      column.addEventListener('blur', () => column.classList.remove('has-focus'));
+      column.addEventListener('keydown', event => {
+        if (event.key === 'Escape') column.classList.add('tooltip-dismissed');
+      });
+      for (const event of ['mouseenter', 'focus']) column.addEventListener(event, () => column.classList.remove('tooltip-dismissed'));
       const track = element('div', 'activity-track');
       const bar = element('div', 'activity-bar');
+      activityTypes.forEach(([type], typeIndex) => {
+        const segment = element('div', `activity-segment activity-${type}`);
+        segment.dataset.type = type;
+        segment.dataset.count = day.types[type];
+        bar.append(segment);
+        const to = day.count ? day.types[type] / day.count * 100 : 0;
+        changes.push({ node: segment, property: 'height', index,
+          from: previous?.segments[index]?.[typeIndex] ?? to, to });
+      });
       track.append(bar);
       // Keep count labels still while the bar below them grows.
       column.append(element('span', 'activity-value', unavailable ? '—' : number(day.count)), track,

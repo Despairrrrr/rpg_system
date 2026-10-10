@@ -296,3 +296,15 @@ that prevents repeated system notifications. Web Locks coordinate reminders betw
 supported same-origin tabs; without them, delivery deduplication is best-effort.
 No notification permission or Goal data is saved merely by opening or cancelling a
 form (a browser permission granted during editing remains a browser setting).
+
+### Weekly Activity completion types
+
+Weekly Activity stacks recorded completion events by Step (teal), Quest (purple) and
+Arc (orange), with a compact legend and daily mouse/keyboard tooltips. Escape dismisses
+the tooltip. A neutral Unclassified segment preserves events without a valid historical
+type; their current Goal type is not evidence of the type at completion. New history
+records snapshot `goalType`; old records are preserved without guessing or backfilling.
+Editing/deleting a Goal does not reclassify its recorded completions. Recurring events
+count separately, and undo removes the corresponding event. The weekly summary sums all
+recorded completions and awarded XP, including records referencing an absent Skill.
+Top Skill Progression remains limited to five earning Skills; Life Areas are unchanged.

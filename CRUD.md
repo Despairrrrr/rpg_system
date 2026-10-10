@@ -19,7 +19,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Skill creation | **+ Add skill** in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
 | Statistics → Life Areas | Create/rename/delete Areas and assign existing Skills; no **+ Create a Skill** button | `#lifeAreasModal`, `createStatisticsView()` |
 | Statistics overview | Week selector plus Goals completed and XP earned only; no Active Skills metric | `#weekSummary`, `#summaryGoals`, `#summaryXp` |
-| Statistics charts | No Skill icons; dynamic user-created Life Areas, not a fixed set of six | `statistics.js`, `statistics-model.js` |
+| Statistics charts | Weekly Activity stacks Step/Quest/Arc events, with explicit Unclassified history and mouse/keyboard tooltips; no Skill icons; dynamic user-created Life Areas, not a fixed set of six | `statistics.js`, `statistics-model.js` |
 
 The shared Goal menu uses `GOAL_MENU_ITEMS`, calls `openGoalModal()`, `deleteGoal()` and `setGoalStatus()`,
 and retains delete confirmation, keyboard navigation, Escape and outside-click dismissal.
@@ -788,6 +788,7 @@ fewer than three Areas shows setup guidance and the existing Manage Life Areas a
 Additional browser scenarios (same isolated runner, no Firebase):
 
 ```sh
+STATISTICS_TEST_SCRIPT=statistics-stacks-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=statistics-polish-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=statistics-polish-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
 ```
@@ -899,3 +900,15 @@ completion writes roll back their in-memory mutation so retry cannot duplicate X
 Regression coverage includes optional-field round trips, migration/idempotency,
 weekday/time/offset validation, midnight/DST, missed occurrences, persistent Skip,
 completion/undo, browser permission outcomes and both desktop/mobile Goal pages.
+
+### Weekly Activity completion types
+
+Weekly Activity stacks recorded completion events by Step (teal), Quest (purple) and
+Arc (orange), with a compact legend and daily mouse/keyboard tooltips. Escape dismisses
+the tooltip. A neutral Unclassified segment preserves events without a valid historical
+type; their current Goal type is not evidence of the type at completion. New history
+records snapshot `goalType`; old records are preserved without guessing or backfilling.
+Editing/deleting a Goal does not reclassify its recorded completions. Recurring events
+count separately, and undo removes the corresponding event. The weekly summary sums all
+recorded completions and awarded XP, including records referencing an absent Skill.
+Top Skill Progression remains limited to five earning Skills; Life Areas are unchanged.

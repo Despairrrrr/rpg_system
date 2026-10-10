@@ -3332,7 +3332,7 @@ function toggleGoalCompletion(
 
   if (completed) {
     const record = {
-      id: crypto.randomUUID(), goalId: goal.id, skillId: skill.id,
+      id: crypto.randomUUID(), goalId: goal.id, skillId: skill.id, goalType: goal.type,
       completionDate: getDayKey(), xpAwarded: nextSkillXp - prevSkillXp,
       ...(occurrence ? { occurrenceKey: occurrence.key } : {}),
     };

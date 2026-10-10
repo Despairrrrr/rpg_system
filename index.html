@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <header class="topbar">
@@ -175,7 +175,9 @@
     <div class="statistics-grid">
       <section class="panel statistics-card activity-card" aria-labelledby="activityTitle">
         <div class="statistics-card-head"><div><h2 id="activityTitle">Weekly Activity</h2><p class="statistics-muted">Goals completed each day</p></div><span id="weeklyGoalCount" class="statistics-total"></span></div>
+        <div id="activityLegend" class="activity-legend" aria-label="Goal types"></div>
         <div class="activity-plot"><div id="activityScale" class="activity-scale" aria-hidden="true"></div><div id="activityChart" class="activity-chart" aria-label="Daily completed goals"></div></div>
+        <p id="activityClassification" class="statistics-muted" hidden>Unclassified completions have no recorded goal type.</p>
         <p id="activityEmpty" class="statistics-muted"></p>
       </section>
       <section class="panel statistics-card" aria-labelledby="progressionTitle">
@@ -425,10 +427,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase.init.js?v=2"></script>
-  <script src="statistics-model.js?v=1"></script>
-  <script src="statistics.js?v=5"></script>
+  <script src="statistics-model.js?v=2"></script>
+  <script src="statistics.js?v=6"></script>
   <script src="schedule-model.js?v=4"></script>
   <script src="reminders.js?v=2"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
