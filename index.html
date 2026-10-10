@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <header class="topbar">
@@ -45,6 +45,18 @@
       <p id="journeyDate" class="field-hint"></p>
       <p id="journeySummary" role="status"></p>
       <progress id="journeyProgress" max="1" value="0" aria-label="Today's goal completion"></progress>
+      <div class="journey-toolbar">
+        <div class="journey-segments" role="group" aria-label="Today's Journey view">
+          <button type="button" data-journey-view="all" aria-pressed="true">All Tasks</button>
+          <button type="button" data-journey-view="split" aria-pressed="false">Journey &amp; Routine</button>
+        </div>
+        <div class="journey-segments journey-sort" id="journeySort" role="group" aria-label="Task order">
+          <button type="button" data-journey-sort="time" aria-pressed="true">By time</button>
+          <button type="button" data-journey-sort="manual" aria-pressed="false">My order</button>
+        </div>
+      </div>
+      <p id="journeyOrderHint" class="field-hint" hidden>Use the arrows to arrange today's tasks. Scheduled times stay the same.</p>
+      <p id="journeyOrderStatus" class="journey-sr-only" role="status"></p>
       <div id="journeyList"></div>
     </section>
     <section class="main-column" id="goalsPage" hidden>
@@ -415,8 +427,8 @@
   <script src="firebase.init.js?v=2"></script>
   <script src="statistics-model.js?v=1"></script>
   <script src="statistics.js?v=5"></script>
-  <script src="schedule-model.js?v=3"></script>
+  <script src="schedule-model.js?v=4"></script>
   <script src="reminders.js?v=2"></script>
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

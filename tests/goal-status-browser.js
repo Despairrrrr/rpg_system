@@ -5,7 +5,7 @@
   const root=()=>isSkillPage?'.goal-tree':'#goalsPage';
   const trigger=id=>document.querySelector(`${root()} [data-id="${id}"] .goal-menu-trigger`);
   const actions=()=>[...document.querySelectorAll('.goal-menu-item')].filter(item=>!item.hidden);
-  const card=id=>document.querySelector(`#journeyList > [data-id="${id}"]`);
+  const card=id=>document.querySelector(`#journeyList [data-id="${id}"]`);
   const choose=(id,label)=>{trigger(id).click();const item=actions().find(item=>item.textContent===label);assert(item,`missing ${label}`);item.click();};
   try {
     const today=getDayKey();

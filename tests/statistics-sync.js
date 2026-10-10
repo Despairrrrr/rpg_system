@@ -40,9 +40,11 @@ async function run() {
   state.oneTimeSchedules = { once: { day: '2026-10-09', configuredAt: 1791540000000 } };
   state.completionHistory.push({ id: 'r', goalId: 'g', skillId: 's', completionDate: Statistics.dayKey(), xpAwarded: 10 });
   Statistics.createArea(state, 'a', 'Learning', ['s']);
+  state.journey = {date:Statistics.dayKey(),selectedIds:['once'],hiddenIds:[],orderIds:['once','scheduled'],viewMode:'split',sortMode:'manual'};
   api.saveState();
   await api.pushToCloud();
   const sent = JSON.parse(writes[writes.length - 1].state);
+  assert(JSON.stringify(sent.journey) === JSON.stringify(state.journey), 'Journey preferences and order upload in the ordinary state document');
   assert(sent.goals[0].status === 'paused' && sent.goals[0].remindersResumeAt === 1791540000000, 'status and reminder cutoff uploaded in ordinary cloud document');
   assert(sent.goals[1].schedule.time === '18:00' && sent.oneTimeSchedules.once.day === '2026-10-09', 'one-time schedule and local date cloud round-trip');
   assert(sent.goals[0].schedule.time === '07:00' && sent.goals[0].reminder.offset === '15m' && sent.reminderReceipts.scheduled.status === 'skipped', 'schedule, reminder and receipt cloud round-trip');
@@ -54,6 +56,7 @@ async function run() {
   cloudReady = false;
   cloud = {updatedAt: state.updatedAt + 100, state: JSON.stringify(sent)};
   await api.pullFromCloud();
+  assert(state.journey.viewMode === 'split' && state.journey.sortMode === 'manual' && state.journey.orderIds.join() === 'once,scheduled', 'remote Journey preferences and order survive migration');
   assert(state.goals[0].status === 'paused' && state.goals[0].remindersResumeAt === 1791540000000 && state.goals[1].status === 'active', 'remote statuses migrate and preserve cutoff');
   cloudReady = false;
   cloud = null;

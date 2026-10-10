@@ -302,9 +302,15 @@ function migrateGoals(goals) {
 function normalizeJourney(value, goals, day = Statistics.dayKey()) {
   const eligible = new Set(goals.filter(goal => ['step', 'quest'].includes(goal.type)).map(goal => goal.id));
   const ids = values => [...new Set(Array.isArray(values) ? values.filter(id => eligible.has(id)) : [])];
-  return value?.date === day
-    ? { date: day, selectedIds: ids(value.selectedIds), hiddenIds: ids(value.hiddenIds) }
-    : { date: day, selectedIds: [], hiddenIds: [] };
+  const sameDay = value?.date === day;
+  return {
+    date: day,
+    selectedIds: sameDay ? ids(value.selectedIds) : [],
+    hiddenIds: sameDay ? ids(value.hiddenIds) : [],
+    orderIds: sameDay ? ids(value.orderIds) : [],
+    viewMode: value?.viewMode === 'split' ? 'split' : 'all',
+    sortMode: value?.sortMode === 'manual' ? 'manual' : 'time',
+  };
 }
 
 function journeyGoals(goals, journey, now = new Date()) {
@@ -323,6 +329,43 @@ function journeyChildren(goal, goals, journey) {
   return goals.filter(child => child.type === 'step' && child.parentGoalId === goal.id &&
     !today.hiddenIds.includes(child.id) &&
     (today.selectedIds.includes(child.id) || GoalSchedule.isEffectivelyActive(child, goals)));
+}
+
+// Only a time relevant to this local day participates in Today's ordering.
+// Reuse the schedule model's one-time anchor (including its legacy fallback).
+function journeyTime(goal, oneTimeSchedules, now = new Date()) {
+  const schedule = GoalSchedule.effective(goal);
+  if (!schedule?.time) return '';
+  if (schedule.type === 'one-time') {
+    const anchor = GoalSchedule.readOneTimeAnchor(goal, oneTimeSchedules?.[goal.id]);
+    return anchor?.day === GoalSchedule.dayKey(now) ? schedule.time : '';
+  }
+  return GoalSchedule.occursOn(schedule, now) ? schedule.time : '';
+}
+
+function orderJourneyGoals(goals, journey, oneTimeSchedules, now = new Date(), manual = false) {
+  const positions = new Map((journey.orderIds || []).map((id, index) => [id, index]));
+  const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  return [...goals].sort((a, b) => {
+    if (manual) {
+      const difference = (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity);
+      if (difference) return difference;
+    }
+    return compare(journeyTime(a, oneTimeSchedules, now) || '24:00', journeyTime(b, oneTimeSchedules, now) || '24:00') ||
+      compare(a.createdAt || '', b.createdAt || '') || compare(a.id, b.id);
+  });
+}
+
+function journeySections(goals, journey, oneTimeSchedules, now = new Date()) {
+  const today = normalizeJourney(journey, goals, GoalSchedule.dayKey(now));
+  const included = journeyGoals(goals, today, now);
+  const ordered = orderJourneyGoals(included, today, oneTimeSchedules, now, today.viewMode === 'all' && today.sortMode === 'manual');
+  if (today.viewMode === 'all') return [{ key: 'all', title: 'All Tasks', goals: ordered }];
+  const selected = new Set(today.selectedIds);
+  return [
+    { key: 'journey', title: 'Journey', goals: ordered.filter(goal => selected.has(goal.id)) },
+    { key: 'routine', title: 'Routine', goals: ordered.filter(goal => !selected.has(goal.id)) },
+  ];
 }
 
 function migrateState(loaded) {
@@ -2128,7 +2171,42 @@ function journeyButton(text, className, action) {
   return button;
 }
 
-function journeyGoalRow(goal) {
+// Presentation edits use the same atomic write and synchronization as selections.
+function changeJourneyPresentation(change) {
+  syncStoredProgress();
+  const previous = structuredClone(state);
+  state.journey = normalizeJourney(state.journey, state.goals);
+  change(state.journey);
+  if (!saveState()) { state = previous; render(); return false; }
+  closeGoalMenu();
+  renderJourney();
+  return true;
+}
+
+function moveJourneyGoal(id, direction) {
+  let position = 0;
+  let total = 0;
+  const saved = changeJourneyPresentation(journey => {
+    const visible = orderJourneyGoals(journeyGoals(state.goals, journey), journey, state.oneTimeSchedules, new Date(), true).map(goal => goal.id);
+    const from = visible.indexOf(id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= visible.length) return;
+    // Retain hidden/nested IDs so restoring a goal also restores its chosen place.
+    const order = [...journey.orderIds, ...visible.filter(value => !journey.orderIds.includes(value))];
+    const first = order.indexOf(id);
+    const second = order.indexOf(visible[to]);
+    [order[first], order[second]] = [order[second], order[first]];
+    journey.orderIds = order;
+    position = to + 1;
+    total = visible.length;
+  });
+  const row = document.querySelector(`#journeyList [data-goal-id="${CSS.escape(id)}"]`);
+  const preferred = row?.querySelector(`[data-journey-move="${direction}"]`);
+  (preferred && !preferred.disabled ? preferred : row?.querySelector('[data-journey-move]:not(:disabled)'))?.focus();
+  if (saved && position) document.getElementById('journeyOrderStatus').textContent = `${state.goals.find(goal => goal.id === id)?.title} moved to position ${position} of ${total}.`;
+}
+
+function journeyGoalRow(goal, now = new Date()) {
   const row = journeyElement('div', `journey-row ${goal.completed ? 'is-completed' : ''}`);
   row.dataset.goalId = goal.id;
   const check = journeyElement('label', 'goal-check');
@@ -2145,21 +2223,84 @@ function journeyGoalRow(goal) {
   content.append(journeyElement('h3', '', goal.title));
   const skill = state.skills.find(item => item.id === goal.skillId);
   const metadata = journeyElement('div', 'goal-metadata');
-  metadata.append(journeyElement('span', 'journey-type', goal.type === 'quest' ? 'Quest' : 'Step'));
   const link = journeyElement('a', 'goal-skill', skill?.name || 'No Skill');
   link.href = `skill.html?id=${encodeURIComponent(goal.skillId)}`;
   metadata.append(link, journeyElement('span', 'goal-xp', `+${goal.xp} XP`));
-  const schedule = GoalSchedule.label(goal);
-  if (schedule) metadata.append(journeyElement('span', 'goal-repeat-badge', schedule));
+  const time = journeyTime(goal, state.oneTimeSchedules, now);
+  const timeLabel = journeyElement('span', `journey-time${time ? ' is-timed' : ''}`, time || 'Anytime');
+  timeLabel.title = GoalSchedule.label(goal) || 'No scheduled time';
+  if (!time && GoalSchedule.effective(goal)?.time) timeLabel.title += ' · Not scheduled for today';
+  metadata.append(timeLabel);
   content.append(metadata);
+  if (goal.description) content.append(journeyElement('p', 'journey-description', goal.description));
   const menu = journeyElement('button', 'goal-menu-trigger', '…');
   menu.type = 'button';
   menu.setAttribute('aria-label', `Actions for ${goal.title}`);
   menu.setAttribute('aria-haspopup', 'menu');
   menu.setAttribute('aria-expanded', 'false');
   createGoalActionsMenu(menu, goal);
-  row.append(check, content, menu);
+  const remove = journeyButton('×', 'journey-remove', () => {
+    if (changeJourneySelection(goal.id, false)) document.getElementById('addJourneyGoal').focus();
+  });
+  remove.setAttribute('aria-label', `Remove from Today's Journey: ${goal.title}`);
+  remove.title = "Remove from Today's Journey";
+  row.append(check, content, menu, remove);
   return row;
+}
+
+function journeyGoalCard(goal, now, manualGoals) {
+  const card = journeyElement('article', `journey-card ${goal.type}${goal.completed ? ' is-completed' : ''}`);
+  card.dataset.id = goal.id;
+  const row = journeyGoalRow(goal, now);
+  const metadata = row.querySelector('.goal-metadata');
+  card.append(row);
+  if (manualGoals) {
+    const controls = journeyElement('div', 'journey-move-controls');
+    const index = manualGoals.findIndex(item => item.id === goal.id);
+    for (const [direction, label] of [[-1, 'up'], [1, 'down']]) {
+      const move = journeyButton(direction === -1 ? '↑' : '↓', 'journey-move', () => moveJourneyGoal(goal.id, direction));
+      move.dataset.journeyMove = direction;
+      move.setAttribute('aria-label', `Move ${goal.title} ${label}`);
+      move.title = `Move ${label}`;
+      move.disabled = index + direction < 0 || index + direction >= manualGoals.length;
+      controls.append(move);
+    }
+    row.prepend(controls);
+  }
+  if (goal.type === 'step' && goal.parentGoalId) {
+    const parent = state.goals.find(item => item.id === goal.parentGoalId);
+    if (parent) metadata.append(journeyElement('span', 'journey-parent', `Part of ${parent.title}`));
+  }
+  if (goal.type === 'quest') {
+    const children = journeyChildren(goal, state.goals, state.journey);
+    const controls = journeyElement('div', 'journey-quest-controls');
+    if (children.length) {
+      const expanded = expandedJourneyQuests.has(goal.id);
+      const toggle = journeyButton(`${expanded ? '▾' : '▸'} ${children.filter(child => child.completed).length}/${children.length} Steps`, 'journey-expand', () => {
+        if (expandedJourneyQuests.has(goal.id)) expandedJourneyQuests.delete(goal.id);
+        else expandedJourneyQuests.add(goal.id);
+        closeGoalMenu();
+        renderJourney();
+      });
+      toggle.dataset.journeyExpand = goal.id;
+      toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.setAttribute('aria-controls', `journey-children-${goal.id}`);
+      controls.append(toggle);
+      const nested = journeyElement('div', 'journey-children');
+      nested.id = `journey-children-${goal.id}`;
+      nested.hidden = !expanded;
+      // Child order is stable through completion and undo, like top-level rows.
+      children.forEach(child => nested.append(journeyGoalRow(child, now)));
+      card.append(nested);
+    } else controls.append(journeyElement('span', 'journey-child-count', '0 Steps'));
+    controls.append(journeyButton('+ Add Step', 'journey-add-step', () => {
+      openGoalModal(null, 'step', goal.skillId, true);
+      els.goalParent.value = goal.id;
+      expandedJourneyQuests.add(goal.id);
+    }));
+    metadata.append(controls);
+  }
+  return card;
 }
 
 function renderJourney() {
@@ -2167,66 +2308,65 @@ function renderJourney() {
   if (!list) return;
   const focused = document.activeElement;
   const expandedId = focused?.dataset.journeyExpand;
+  const now = new Date();
+  const journey = normalizeJourney(state.journey, state.goals, GoalSchedule.dayKey(now));
+  const sections = journeySections(state.goals, journey, state.oneTimeSchedules, now);
+  const goals = sections.flatMap(section => section.goals);
+  const manual = journey.viewMode === 'all' && journey.sortMode === 'manual';
+  document.querySelectorAll('[data-journey-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.journeyView === journey.viewMode)));
+  document.querySelectorAll('[data-journey-sort]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.journeySort === journey.sortMode)));
+  document.getElementById('journeySort').hidden = journey.viewMode !== 'all';
+  document.getElementById('journeyOrderHint').hidden = !manual;
   list.replaceChildren();
-  const goals = journeyGoals(state.goals, state.journey);
   const done = goals.filter(goal => goal.completed).length;
-  document.getElementById('journeyDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  document.getElementById('journeyDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   document.getElementById('journeySummary').textContent = `${done} of ${goals.length} completed${goals.length && done === goals.length ? ' · All done for today' : ''}`;
   const progress = document.getElementById('journeyProgress');
   progress.max = goals.length || 1;
   progress.value = done;
-  if (!goals.length) {
+  if (!goals.length && journey.viewMode === 'all') {
     const empty = journeyElement('div', 'journey-empty panel');
     empty.append(journeyElement('h2', '', 'Make room for today'), journeyElement('p', 'field-hint', 'Add something you’d like to work on. Scheduled goals appear here automatically.'));
     empty.append(journeyButton('+ Add a Goal', 'secondary-btn', openJourneyPicker));
     list.append(empty);
   }
-  for (const goal of goals) {
-    const card = journeyElement('article', `journey-card ${goal.type}`);
-    card.dataset.id = goal.id;
-    const row = journeyGoalRow(goal);
-    const remove = journeyButton('×', 'journey-remove', () => {
-      if (changeJourneySelection(goal.id, false)) document.getElementById('addJourneyGoal').focus();
-    });
-    remove.setAttribute('aria-label', `Remove from Today's Journey: ${goal.title}`);
-    remove.title = "Remove from Today's Journey";
-    row.append(remove);
-    card.append(row);
-    if (goal.type === 'step' && goal.parentGoalId) {
-      const parent = state.goals.find(item => item.id === goal.parentGoalId);
-      if (parent) card.append(journeyElement('p', 'journey-parent field-hint', `Part of ${parent.title}`));
+  for (const section of sections) {
+    if (!goals.length && journey.viewMode === 'all') continue;
+    const container = journeyElement('section', 'journey-section');
+    container.dataset.journeySection = section.key;
+    container.setAttribute('aria-label', section.title);
+    if (journey.viewMode === 'split') {
+      const heading = journeyElement('h2', 'journey-section-title', section.title);
+      heading.append(journeyElement('span', 'journey-count', String(section.goals.length)));
+      container.append(heading);
+      if (!section.goals.length) container.append(journeyElement('p', 'journey-section-empty field-hint', section.key === 'journey' ? 'Add a Goal to choose something for today.' : 'No automatic routines scheduled for today.'));
     }
-    if (goal.type === 'quest') {
-      const children = journeyChildren(goal, state.goals, state.journey);
-      const controls = journeyElement('div', 'journey-quest-controls');
-      if (children.length) {
-        const expanded = expandedJourneyQuests.has(goal.id);
-        const toggle = journeyButton(`${expanded ? '▾' : '▸'} ${children.filter(child => child.completed).length}/${children.length} Steps`, 'secondary-btn', () => {
-          if (expandedJourneyQuests.has(goal.id)) expandedJourneyQuests.delete(goal.id);
-          else expandedJourneyQuests.add(goal.id);
-          renderJourney();
-        });
-        toggle.dataset.journeyExpand = goal.id;
-        toggle.setAttribute('aria-expanded', String(expanded));
-        toggle.setAttribute('aria-controls', `journey-children-${goal.id}`);
-        controls.append(toggle);
-        const nested = journeyElement('div', 'journey-children');
-        nested.id = `journey-children-${goal.id}`;
-        nested.hidden = !expanded;
-        children.sort((a, b) => Number(Boolean(a.completed)) - Number(Boolean(b.completed))).forEach(child => nested.append(journeyGoalRow(child)));
-        card.append(controls, nested);
-      } else card.append(controls);
-      controls.append(journeyButton('+ Add Step', 'journey-add-step', () => {
-        openGoalModal(null, 'step', goal.skillId, true);
-        els.goalParent.value = goal.id;
-        expandedJourneyQuests.add(goal.id);
-      }));
+    const groups = manual ? [{ title: '', goals: section.goals }] : [
+      { title: 'Scheduled', goals: section.goals.filter(goal => journeyTime(goal, state.oneTimeSchedules, now)) },
+      { title: 'Anytime', goals: section.goals.filter(goal => !journeyTime(goal, state.oneTimeSchedules, now)) },
+    ];
+    for (const group of groups) {
+      if (!group.goals.length) continue;
+      const rows = journeyElement('div', 'journey-group');
+      if (group.title) {
+        rows.dataset.journeyGroup = group.title.toLowerCase();
+        rows.append(journeyElement(journey.viewMode === 'split' ? 'h3' : 'h2', 'journey-group-title', group.title));
+      }
+      group.goals.forEach(goal => rows.append(journeyGoalCard(goal, now, manual ? section.goals : null)));
+      container.append(rows);
     }
-    list.append(card);
+    list.append(container);
   }
   if (expandedId) list.querySelector(`[data-journey-expand="${CSS.escape(expandedId)}"]`)?.focus();
   if (document.getElementById('journeyPicker').open) renderJourneyChoices();
 }
+
+document.querySelectorAll('[data-journey-view]').forEach(button => button.addEventListener('click', () => {
+  changeJourneyPresentation(journey => { journey.viewMode = button.dataset.journeyView; });
+}));
+document.querySelectorAll('[data-journey-sort]').forEach(button => button.addEventListener('click', () => {
+  changeJourneyPresentation(journey => { journey.sortMode = button.dataset.journeySort; });
+}));
 
 function renderJourneyChoices() {
   const choices = document.getElementById('journeyChoices');

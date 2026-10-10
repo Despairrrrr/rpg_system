@@ -19,7 +19,8 @@ html = (ROOT / page).read_text()
 html = re.sub(r'<script src="https:[^"]+"></script>', '', html)
 html = re.sub(r'<link[^>]+https:[^>]+>', '', html)
 html = re.sub(r'<script src="firebase.init.js[^"]*"></script>', '', html)
-html = html.replace('<script src="statistics-model.js', '<script>localStorage.setItem("neonGoalTracker.v1", ' + json.dumps(json.dumps(seed)) + ');</script><script src="statistics-model.js')
+# Seed once per isolated profile so refresh tests exercise persisted application state.
+html = html.replace('<script src="statistics-model.js', '<script>if (localStorage.getItem("neonGoalTracker.v1") === null) localStorage.setItem("neonGoalTracker.v1", ' + json.dumps(json.dumps(seed)) + ');</script><script src="statistics-model.js')
 instrumentation = """<script>
 window.__browserErrors = [];
 window.addEventListener('error', event => window.__browserErrors.push(event.message));

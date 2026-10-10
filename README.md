@@ -37,8 +37,18 @@ See [AGENTS.md](AGENTS.md) and the [current interface contract](CRUD.md#current-
 
 Start with today's scheduled Steps and Quests, or use **+ Add a Goal** to select an
 existing goal or create one. Expand Quests to complete their child Steps. The × hides
-any top-level goal for today; add it again through the picker whenever plans change.
-Manual selections and removals clear on the next local day. All views share the same
+any goal, including a nested Step, for today; add it again through the picker whenever plans change.
+Choose **All Tasks** for a unified list or **Journey & Routine** to separate manually
+chosen goals from automatic recurring tasks. A manually selected routine appears once,
+in Journey; child Steps stay beneath their visible Quest. Both views share the same count.
+
+**By time** orders today's configured times, with untimed goals under **Anytime**.
+**My order** provides keyboard-accessible up/down buttons and remembers today's sequence,
+even after changing views or sorting. Completed goals stay visible in place for easy undo.
+Compact rows wrap longer content, and Quests expand without reserving empty space.
+
+View/sort preferences persist in the ordinary local state and Firebase mirror. Manual
+selections, removals and custom ordering clear on the next local day; preferences remain. All views share the same
 Goals, XP and history, and the Skills sidebar animates completion and undo progress.
 No quotas, penalties or separate daily rewards are added.
 

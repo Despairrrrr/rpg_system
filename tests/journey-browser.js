@@ -1,7 +1,7 @@
 (async () => {
   const assert = (ok, message) => { if (!ok) throw new Error(message); };
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const card = id => document.querySelector(`#journeyList > [data-id="${id}"]`);
+  const card = id => document.querySelector(`#journeyList [data-id="${id}"]`);
   const check = id => document.querySelector(`#journeyList [data-goal-id="${id}"] input`);
   try {
     assert([...document.querySelectorAll('.nav-item')].map(node => node.dataset.section).join() === 'journey,goals,statistics', 'navigation order');

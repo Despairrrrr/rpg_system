@@ -72,6 +72,10 @@ const GoalSchedule = (() => {
     return Number.isFinite(created.getTime()) ? { day: dayKey(created), configuredAt: created.getTime() } : null;
   }
 
+  function readOneTimeAnchor(goal, stored) {
+    return validAnchor(stored) ? stored : creationAnchor(goal);
+  }
+
   // Keep the public Goal.schedule shape unchanged. The caller stores this
   // local calendar anchor in optional state.oneTimeSchedules[goal.id].
   function oneTimeAnchor(goal, previous, stored, now = new Date()) {
@@ -79,7 +83,7 @@ const GoalSchedule = (() => {
     if (schedule?.type !== 'one-time' || !schedule.time) return null;
     const before = read(previous);
     if (before?.type === 'one-time' && before.time === schedule.time) {
-      const anchor = validAnchor(stored) ? stored : creationAnchor(goal);
+      const anchor = readOneTimeAnchor(goal, stored);
       if (anchor) return !reminder(previous).enabled && reminder(goal).enabled
         ? { ...anchor, configuredAt: now.getTime() } : anchor;
     }
@@ -126,7 +130,7 @@ const GoalSchedule = (() => {
     if (!schedule?.time || !configured.enabled) return null;
     const [hours, minutes] = schedule.time.split(':').map(Number);
     if (schedule.type === 'one-time') {
-      const anchor = validAnchor(oneTimeSchedule) ? oneTimeSchedule : creationAnchor(goal);
+      const anchor = readOneTimeAnchor(goal, oneTimeSchedule);
       if (!anchor || goal.completed) return null;
       const [year, month, day] = anchor.day.split('-').map(Number);
       const scheduledAt = new Date(year, month - 1, day, hours, minutes).getTime();
@@ -190,5 +194,5 @@ const GoalSchedule = (() => {
     }).sort((a, b) => b.scheduledAt - a.scheduledAt || a.key.localeCompare(b.key));
   }
 
-  return { types, offsets, validTime, read, reminder, validate, effective, dayKey, oneTimeAnchor, occursOn, shouldReset, label, latestDue, isEffectivelyActive, resumeReminders, pending };
+  return { types, offsets, validTime, read, reminder, validate, effective, dayKey, readOneTimeAnchor, oneTimeAnchor, occursOn, shouldReset, label, latestDue, isEffectivelyActive, resumeReminders, pending };
 })();
