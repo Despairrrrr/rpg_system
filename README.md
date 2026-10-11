@@ -31,6 +31,7 @@ set, and opens the same shared **…** menu with **Load a photo / Delete photo**
 The Statistics Life Areas dialog assigns existing Skills and intentionally has no
 **+ Create a Skill** button. Create Skills through **+ Add skill** in the dashboard panel.
 New features should preserve these decisions unless the user explicitly changes them.
+Life History / Chronicles is not included in the current implementation after its rollback.
 See [AGENTS.md](AGENTS.md) and the [current interface contract](CRUD.md#current-interface-contract).
 
 ## Today's Journey
@@ -101,7 +102,7 @@ creates the Firebase user, later ones just sign it in.
 - Automatic goal counts showing the remaining work: completed non-repeating Goals are
   excluded, while repeating Goals stay counted until their reset. Completed Goals sort to
   the bottom of their column.
-- Statistics: daily completion counts, the top five Skills by weekly XP, and Life Area shares of categorized weekly XP. All use the same Monday–Sunday week; future weeks are disabled.
+- Statistics: daily stacked Step/Quest/Arc completion events (plus Unclassified history), the top five Skills by weekly XP, and Life Area shares of categorized weekly XP. All use the same Monday–Sunday week; future weeks are disabled.
 - Statistics uses a compact title/week/summary header, two upper chart panels, and a
   full-width Life Areas radar/breakdown. The summary contains **Goals completed** and
   **XP earned** only; there is no Active Skills metric and no Skill icon in the ranking.
@@ -122,9 +123,10 @@ creates the Firebase user, later ones just sign it in.
   frequency, days and time (or Any time). The old four types
   (`daily` / `short` / `medium` / `long`) are migrated on load: `daily` becomes a repeating step,
   `short` a step, `medium` a quest and `long` an arc, keeping titles, XP, completion and streaks.
-- Exponential level/XP curve (reaching level N requires (N-1)^2 * 100 XP).
+- Quadratic level/XP curve (reaching level N requires (N-1)^2 * 100 XP).
 - Completion feedback: the checkbox pops, the card switches to a dimmed "done" state with a
-  `Done today` chip, a `+XP` hint floats up from the card, and the skill and player bars animate
+  `Done today` / `Done` (repeating) or `Completed` (one-time) chip. A `+XP` hint floats up
+  from the card, and the skill and player bars animate
   from their old values to the new ones. A skill or player level-up adds a compact toast
   (`READING LEVEL UP — Lv. 4 → Lv. 5`); two level-ups play one after the other. The one goal
   reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
@@ -308,3 +310,22 @@ Editing/deleting a Goal does not reclassify its recorded completions. Recurring 
 count separately, and undo removes the corresponding event. The weekly summary sums all
 recorded completions and awarded XP, including records referencing an absent Skill.
 Top Skill Progression remains limited to five earning Skills; Life Areas are unchanged.
+
+## Verification
+
+Run commands from `front/`; the complete model/browser matrix is in
+[CRUD.md → Verification](CRUD.md#verification). For the latest Journey, status and
+stacked weekly statistics changes:
+
+```sh
+gjs tests/journey-model.js
+gjs tests/goal-status-model.js
+gjs tests/statistics-model.js
+gjs tests/statistics-sync.js
+STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=statistics-stacks-browser.js python3 tests/statistics-browser.py webkit
+```
+
+Browser checks use isolated fixture data and omit Firebase. Append `390 844` for a
+mobile viewport; `STATISTICS_REDUCED_MOTION=1` exercises reduced motion in WebKit.

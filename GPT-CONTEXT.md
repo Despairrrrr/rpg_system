@@ -1,7 +1,9 @@
 # Goal Tracker — полный контекст для передачи другой модели (GPT)
 
 Всё ниже написано **по коду** (app.js, страницы, модули, стили, тесты), а не по AGENTS.md/README.md.
-Скопируй этот файл целиком в модель как системный контекст перед задачей.
+Контекст сверен с текущим кодом после коммита `e8c7461` (Improved Weekly Statistics).
+Life History / Chronicles были отменены: их раздела, модулей и полей в текущей реализации нет.
+Скопируй этот файл целиком в модель как контекст перед задачей.
 
 ---
 
@@ -10,7 +12,7 @@
 **Goal Tracker** — одностраничное ванильное HTML/CSS/JS-приложение-трекер целей с геймификацией
 (XP, уровни, стрик, навыки, статистика). Без фреймворков и сборщиков. Три страницы:
 
-- `index.html` — дашборд (цели + сайдбар) и секция Statistics;
+- `index.html` — дашборд (Today’s Journey / Goals + сайдбар) и секция Statistics;
 - `skill.html` — детальная страница навыка с деревом целей (`?id=<skillId>`);
 - `login.html` + `login.js` — вход через Google (`signInWithPopup`), guard от open-redirect на `?next=`, есть «Continue without an account».
 
@@ -24,21 +26,23 @@ firebase-app-compat.js (10.12.2)
 firebase-auth-compat.js
 firebase-firestore-compat.js
 firebase.init.js?v=2            — инициализирует app только если задан apiKey
-statistics-model.js?v=1          — глобальный Statistics
-statistics.js?v=5                — createStatisticsView({getState, save}); null без #statisticsPage (поэтому безопасен на skill.html)
-schedule-model.js?v=2            — глобальный GoalSchedule
+statistics-model.js?v=2          — глобальный Statistics
+statistics.js?v=6                — createStatisticsView({getState, save}); null без #statisticsPage (поэтому безопасен на skill.html)
+schedule-model.js?v=4            — глобальный GoalSchedule
 reminders.js?v=2                 — createReminderPanel, createReminderSystem, createBrowserReminders
-app.js?v=16                      — всё приложение
-styles.css?v=16                  — на всех трёх страницах
+app.js?v=20                      — всё приложение
+styles.css?v=19                  — на всех трёх страницах
 ```
 
 `login.html` грузит только firebase-app + firebase-auth + firebase.init + `login.js?v=2` (без Firestore).
 Порядок обязателен: `Statistics` → statistics.js; `GoalSchedule` → reminders.js и app.js.
 
 **Тесты** (`tests/`, gjs/node): model-тесты вырезают DOM-free блок `// <goal-model> … // </goal-model>`
-из app.js и гоняют настоящий код:
+из app.js или загружают отдельные модели и гоняют настоящий код:
 
 ```
+gjs tests/goal-status-model.js
+gjs tests/journey-model.js
 gjs tests/goal-model.js
 gjs tests/daily-reset.js
 gjs tests/schedule-model.js
@@ -50,7 +54,16 @@ TZ=America/New_York gjs tests/schedule-model.js   # и аналогично stat
 ```
 
 Плюс браузерные UI-тесты через изолированный раннер: `STATISTICS_TEST_SCRIPT=<file>` с
-`tests/*-browser.js`. Не выдумывать другие раннеры — сначала проверить, что есть в репо.
+`tests/*-browser.js`. Команды, в том числе для мобильного экрана и reduced motion, см. в
+`CRUD.md` → Verification. Проверки новых возможностей:
+
+```sh
+STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=statistics-stacks-browser.js python3 tests/statistics-browser.py webkit
+```
+
+Раннер использует изолированные данные и не загружает Firebase.
 
 ## 3. Хранилище и синхронизация
 
@@ -80,6 +93,8 @@ state = {
   completionHistory: [...],
   statisticsStartedOn: "YYYY-MM-DD",
   schemaVersion: 3,                  // добавляется миграцией
+  journey: { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [], orderIds: [],
+             viewMode: "all"|"split", sortMode: "time"|"manual" },
   oneTimeSchedules?: { [goalId]: { day: "YYYY-MM-DD", configuredAt: ms } },
   reminderReceipts?: { [goalId]: { key, status: "done"|"skipped" } },
 }
@@ -89,6 +104,8 @@ state = {
 ```js
 { id: uuid, title (1..80), description (≤160),
   type: "step"|"quest"|"arc",
+  status: "active"|"paused",
+  remindersResumeAt?: ms,           // подавляет напоминания, срок которых раньше возобновления
   skillId: <обязательно, существующий навык>,
   parentGoalId: "" | id,             // step→quest|arc, quest→arc, arc→нет; только в том же skill
   xp: int ≥ 0,                       // пресеты: step [10,15,30,50,100,125], quest [200,350,500], arc [1000,2000,5000] (+кастом)
@@ -105,10 +122,14 @@ state = {
 
 **Skill**: `{ id, name, goal, xp, lifeAreaId }` (`lifeAreaId: ""` допустим).
 **LifeArea**: `{ id, name }` (name ≤50, создание требует ≥1 существующий навык).
-**CompletionHistory**: `{ id, goalId, skillId, completionDate, xpAwarded, occurrenceKey? }`.
+**CompletionHistory**: `{ id, goalId, skillId, goalType?, completionDate, xpAwarded, occurrenceKey? }`.
+
+`goalType` записывается при новом завершении; отсутствие/невалидное значение у старой
+записи означает **Unclassified**, а не текущий тип Goal. Типы и награды истории не
+переписываются при редактировании/удалении Goal. Названия и уровни в историю не записываются.
 
 **XP/уровни**:
-- XP навыка = сумма наград за его цели; **XP игрока = сумма XP навыков** (производная, не хранится).
+- XP навыка — текущий баланс с сохранением старого XP; история может покрывать лишь его часть; **XP игрока = сумма XP навыков** (производная, не хранится).
 - `level = floor(sqrt(xp/100)) + 1`; порог `(level-1)²·100`; ширина `(2·level-1)·100`.
 
 ## 5. Поведение CRUD и прогресса
@@ -125,7 +146,7 @@ state = {
   - двойное начисление невозможно (no-op при совпадении состояния);
   - undo вычитает **записанный** `xpAwarded` из **записанного** `skillId` (не из текущего);
   - XP навыка клампится в 0; level-up детектится по `getLevelInfo` до/после;
-  - успешное завершение: `bumpStreak()`, запись в историю, `activeCompletionId`;
+  - успешное завершение: `bumpStreak()`, запись фактической награды и `goalType` в историю, `activeCompletionId`;
   - undo: удаляет запись истории, чистит `completedScheduleDay`, удаляет receipt со статусом `done`.
 - **Сбросы** — `resetRepeatingGoals()` на каждом `render()` и по смене дня (таймер ≤60 с,
   `focus/pageshow/visibilitychange`): one-time не сбрасываются; daily — когда `completedDay ≠ сегодня`
@@ -147,8 +168,8 @@ state = {
   цикл-гард (недостижимые узлы становятся корнями), сортировка по `goalTypeOrder`,
   вложенные `<ul class="goal-tree-list">`, узел с `border-left: 4px solid currentColor`
   по роли; рекурсивные дети.
-- **Общее меню «…»** `createGoalActionsMenu()` + `GOAL_MENU_ITEMS` = [Edit, Delete]
-  (danger-стиль). Один shared `<div class="goal-menu" role="menu">` в body, items
+- **Общее меню «…»** `createGoalActionsMenu()` + `GOAL_MENU_ITEMS` = [Edit, Delete, Pause goal / Resume goal]
+  (Delete с danger-стилем; Pause/Resume зависит от собственного статуса). Один shared `<div class="goal-menu" role="menu">` в body, items
   перерисовываются при каждом открытии — этим же механизмом пользуются скиллы
   (Edit/Delete скилла) и аватар (Load a photo / Delete photo, Delete disabled без фото).
   Клавиатура: ArrowUp/Down/Home/End с skip disabled и wrap, Tab/Escape закрывают с возвратом
@@ -156,16 +177,20 @@ state = {
 
 ## 7. Интерфейс (принятые решения — не баги)
 
-1. Топ-навигация index.html — ровно **Goals** и **Statistics**. **Вкладки Skills нет** —
+1. Топ-навигация index.html — ровно **Today’s Journey → Goals → Statistics** (Today’s Journey открыт по умолчанию). **Вкладки Skills нет** —
    навыки в сайдбаре дашборда, клик ведёт на `skill.html?id=…`.
-2. У каждой цели (и на дашборде, и в дереве скилла) ровно **одно меню «…»** с Edit/Delete.
+2. У каждой цели (и на дашборде, и в дереве скилла) ровно **одно меню «…»** с Edit/Delete/Pause goal или Resume goal.
    Не заменять на постоянные кнопки или hover-контролы.
-3. Statistics — ровно три модуля: **Weekly Activity** (DOM/CSS столбцы, не canvas),
+3. Statistics — ровно три модуля: **Weekly Activity** (DOM/CSS stacked-столбцы Step/Quest/Arc + Unclassified, не canvas),
    **Top Skill Progression** (топ-5 по XP за неделю, полосы в %), **Life Areas**
    (SVG-радар для 3–8 зон + список процентов, цвет зоны — хеш id из палитры). Один общий
    селектор недели Пн–Вс, будущие недели заблокированы. В сводке только «Goals completed»
    и «XP earned». Анимации входа/смены недели уважают `prefers-reduced-motion`;
    недели **без истории** (до `statisticsStartedOn`) отличаются от недель с нулевой активностью.
+   Считаются события завершения, включая повторные и с нулевой наградой; XP берётся из
+   `xpAwarded`, включая записи отсутствующих Skills. `Statistics.weekly()` возвращает
+   `{ days, skills, areas, categorizedXp, earned }`; у дня — `count` и `types`.
+   Легенда компактная; tooltip по hover/focus показывает день, все типы и итог, Escape закрывает его.
 4. Диалог Life Areas только **назначает существующие навыки** — кнопки «+ Create a Skill» там
    нет; создание навыков — в панели Skills дашборда.
 5. Аватар — настоящая загрузка: «+» в кольце пока фото нет, меню Load/Delete photo;
@@ -189,11 +214,32 @@ state = {
 10. Модалки — нативные `<dialog>.showModal()`; удаления — браузерные `confirm()`;
     гарды — `alert()`. Это текущая конвенция.
 
+## Today’s Journey и Pause/Resume
+
+- `renderJourney()` / `journeySections()` показывают Step/Quest в All Tasks (по умолчанию)
+  либо Journey & Routine. Автоматически включаются только эффективно активные повторяющиеся
+  Goals на сегодня; ручной выбор включает и paused/one-time Goals. Прямые дочерние Steps
+  раскрываются под видимым Quest и не дублируются; paused-ребёнок требует ручного выбора.
+- By time сортирует по времени, относящемуся к сегодняшнему дню, затем `createdAt` и ID;
+  без времени — Anytime. My order в All Tasks использует доступные кнопки вверх/вниз и
+  `orderIds`. Split-view сортируется по времени. Завершение не переставляет строки.
+- × скрывает Goal только на сегодня; picker может вернуть его. Ручные selected/hidden/order
+  очищаются при смене локального дня; `viewMode` / `sortMode` сохраняются. Новые Goals
+  из Today создаются обычным CRUD и одновременно выбираются на сегодня.
+- `GoalSchedule.isEffectivelyActive()` учитывает всю цепочку родителей, не меняя статус
+  детей. `setGoalStatus()` использует обычный save/rollback/sync; пауза не меняет XP,
+  историю, настройки расписания или возможность ручного завершения.
+- `GoalSchedule.resumeReminders()` ставит `remindersResumeAt` вновь активным Goals,
+  в том числе при перепривязке/удалении предка. Напоминания с `dueAt` раньше этой метки
+  подавляются. Label/tooltip общего меню различает собственную и унаследованную паузу.
+
 ## 8. Миграции (не ломать)
 
 - Легаси-типы: `daily`→`{step, repeatsDaily:true}`, `short`→`{step, false}`,
   `medium`→`quest`, `long`→`arc`; неизвестное → step; у arc `repeatsDaily` форсится false.
 - `repeatsDaily:true` без schedule → `{schedule:{type:"daily"}, reminder:{enabled:false, offset:"0m"}}`.
+- Отсутствующий/невалидный `status` становится `active`; `normalizeJourney()` добавляет
+  и нормализует Today без изменения XP/history/`updatedAt`. Старый `goalType` в истории не угадывается.
 - `normalizeGoalParents()` отвязывает битые/самоссылочные/несовместимые/чужие-скиллу parentGoalId,
   но сами цели не удаляет. Никогда не сбрасывать `neonGoalTracker.v1` ради нового фича,
   не выдумывать историю до начала трекинга.
@@ -221,9 +267,9 @@ optionally mirrored to Firestore (single doc users/{uid} = {state: JSON string, 
 800 ms debounce, last-write-wins). localStorage is the source of truth; Firestore is an
 optional mirror. Never reset storage, never invent historical data.
 
-The repository contains: index.html (dashboard + Statistics + dialogs), skill.html
+The repository contains: index.html (Today's Journey / Goals dashboard + Statistics + dialogs), skill.html
 (skill detail, body[data-page="skill"], ?id=<skillId>), login.html + login.js (Google
-sign-in, open-redirect guard), app.js (~4200 lines: state, CRUD, rendering, sync, auth, FX),
+sign-in, open-redirect guard), app.js (state, CRUD, rendering, sync, auth, FX),
 statistics-model.js (global `Statistics`), statistics.js (createStatisticsView({getState, save})),
 schedule-model.js (global `GoalSchedule`), reminders.js (createReminderPanel,
 createReminderSystem, createBrowserReminders), styles.css (dark neon theme, --motion-* tokens),
@@ -232,24 +278,25 @@ from app.js, plus isolated browser tests). Scripts load in a fixed order with ?v
 identical on index.html and skill.html.
 
 DATA MODEL:
-- goal: {id, title≤80, type: step|quest|arc, skillId (must reference an existing skill),
+- goal: {id, title≤80, type: step|quest|arc, status: active|paused, remindersResumeAt?, skillId (must reference an existing skill),
   parentGoalId (step→quest|arc, quest→arc, arc→none; same skill only), description≤160,
   xp≥0 (presets: step [10,15,30,50,100,125], quest [200,350,500], arc [1000,2000,5000]),
   repeatsDaily, schedule? {type: one-time|daily|weekly|custom, time? "HH:MM", daysOfWeek? 1..7
   (1=Mon…7=Sun)}, reminder? {enabled, offset: 0m|5m|15m|30m}, completed, completedDay,
   activeCompletionId, completedScheduleDay?, createdAt}
 - skill: {id, name, goal, xp, lifeAreaId ("" allowed)}; lifeArea: {id, name}
-- completionHistory: {id, goalId, skillId, completionDate, xpAwarded, occurrenceKey?}
+- completionHistory: {id, goalId, skillId, goalType?, completionDate, xpAwarded, occurrenceKey?}
 - profile: {name, photo (centre-cropped 256×256 JPEG data URL ≤150 KB, read only via
   readProfilePhoto(), never injected via innerHTML)}
+- journey: {date, selectedIds, hiddenIds, orderIds, viewMode: all|split, sortMode: time|manual}
 - optional: oneTimeSchedules {goalId:{day, configuredAt}}, reminderReceipts {goalId:{key,status}}
 - player XP = sum of skill XP (derived, never stored); level = floor(sqrt(xp/100))+1,
   threshold (L-1)²·100, span (2L-1)·100.
 
 BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
-1. index.html top nav has exactly Goals and Statistics. There is NO Skills tab — skills live
+1. index.html top nav is Today's Journey, Goals, Statistics; Today's Journey is the default. There is NO Skills tab — skills live
    in the dashboard sidebar and link to skill.html?id=….
-2. One shared "…" actions menu per Goal (createGoalActionsMenu + GOAL_MENU_ITEMS: Edit/Delete)
+2. One shared "…" actions menu per Goal (createGoalActionsMenu + GOAL_MENU_ITEMS: Edit/Delete/Pause goal or Resume goal)
    used by BOTH renderGoals() (dashboard cards) and renderGoalTreeNode() (skill tree). Never
    replace it with permanently visible buttons or hover-only controls. Skills and the profile
    avatar reuse the same menu mechanism (skill-specific actions; photo actions "Load a photo"/
@@ -259,7 +306,10 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
    sharing one Monday–Sunday week picker with future weeks disabled. Charts are DOM/CSS bars
    and an SVG radar (no canvas). No Active Skills in the weekly summary, no Skill icons in
    progression. Animation respects prefers-reduced-motion; untracked history weeks are
-   distinguished from tracked weeks with zero activity.
+   distinguished from tracked weeks with zero activity. Weekly Activity stacks Step/Quest/Arc
+   completion events using recorded goalType, plus Unclassified for missing/invalid snapshots.
+   Never infer past type from current Goals. Summary XP sums recorded rewards (including absent
+   Skills). Hover/focus tooltips show all type counts and the total; Escape dismisses them.
 4. The Life Areas dialog assigns existing Skills only — no "+ Create a Skill" button there.
    Skill creation lives in the dashboard Skills panel.
 5. Every Goal must reference an existing Skill. Roles (Step/Quest/Arc) are independent of
@@ -289,13 +339,26 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
     animation tokens --motion-* with reduced-motion fallbacks. Keep ?v=N cache-bust tokens
     consistent across index.html and skill.html when you change a shared asset.
 
+12. Today's Journey has All Tasks and Journey & Routine views. Include scheduled effectively
+    active Step/Quest Goals automatically, or manually selected Goals regardless of pause.
+    Nested Steps remain beneath their visible Quest. By time uses today's relevant schedule;
+    My order in All Tasks uses accessible reorder buttons. Completion keeps rows in place.
+    The date-scoped × removes a Goal for today. On a new day clear selections/removals/order,
+    retaining view/sort preferences. Creation/undo use normal Goal CRUD and rewards.
+13. Own status is active|paused; ancestor pausing is dynamic and never rewrites child statuses.
+    Today and reminders share GoalSchedule.isEffectivelyActive(). Effective resume (including
+    hierarchy edits) suppresses reminders due before remindersResumeAt, preserving schedules.
+14. Life History/Chronicles is not part of this checked-out implementation. Its modules and
+    chronicle snapshots are absent; adding them would be a separate product change.
+
 CONSTRAINTS:
 - Vanilla JS only. Globals and load order matter: firebase compat → firebase.init →
   statistics-model → statistics → schedule-model → reminders → app.js (same on both pages).
 - Check BOTH goal render paths and both pages when changing goal interactions.
 - Use native <dialog>.showModal() for modals and browser confirm()/alert() for delete/guards
   (that is the current convention).
-- Run the relevant tests after changes: `gjs tests/goal-model.js`, `gjs tests/daily-reset.js`,
+- Run the relevant tests after changes: `gjs tests/goal-status-model.js`, `gjs tests/journey-model.js`,
+  `gjs tests/goal-model.js`, `gjs tests/daily-reset.js`,
   `gjs tests/schedule-model.js`, `gjs tests/reminders.js`, `gjs tests/statistics-model.js`,
   `gjs tests/statistics-sync.js`, `gjs tests/streak-motion.js` (also once under
   TZ=America/New_York), plus browser tests via the isolated runner

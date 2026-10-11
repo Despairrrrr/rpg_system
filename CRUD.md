@@ -32,9 +32,13 @@ The dashboard and Skill page render Goals separately, so changes to Goal actions
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
 
+Life History / Chronicles was reverted and is not present in this implementation.
+
 Old screenshots and commits may show the removed controls. They are not a specification
 for new work. The CRUD snippets below explain individual operations; inspect the actual
 functions before editing so validation, history, migration and shared UI behavior survive.
+CRUD code snippets below are abbreviated teaching examples, not replacement implementations;
+validation, optional fields, save-failure rollback and reminder refresh live in the actual code.
 
 ## Today's Journey
 
@@ -135,6 +139,9 @@ The application keeps one `state` object:
     name: "User User",
     photo: ""             // optional data URL; "" or absent means the empty plus
   },
+  streak: { count: 0, date: "" },
+  journey: { date: "2026-10-04", selectedIds: [], hiddenIds: [], orderIds: [],
+             viewMode: "all", sortMode: "time" },
   goals: [],
   skills: [],
   lifeAreas: [],
@@ -241,14 +248,18 @@ the additional Statistics fields. Cloud uploads wait for the sign-in comparison.
 
 ```js
 function saveState({ maintenance = false } = {}) {
-  if (!maintenance) state.updatedAt = Date.now();
+  if (!maintenance) state.updatedAt = Math.max(Date.now(), (Number(state.updatedAt) || 0) + 1);
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   queueCloudSync();
 }
 ```
 
-After each create/update/delete operation:
+Actual `saveState()` returns false and displays `#storageError` when storage fails;
+Goal create/edit/completion/status handlers restore their pre-write snapshot on failure.
+Maintenance preserves the edit timestamp; normal writes increase it strictly.
+
+After each successful create/update/delete operation:
 
 ```js
 saveState();
@@ -270,6 +281,7 @@ function createGoal(data) {
   if (!state.skills.some(skill => skill.id === data.skillId)) return;
   state.goals.push({
     id: crypto.randomUUID(),
+    status: "active",
     title: data.title.trim(),
     type: data.type,
     repeatsDaily: data.repeatsDaily,
@@ -337,7 +349,7 @@ const ordered = [
 ordered.forEach((goal) => {
   // clone template
   // insert title, description, XP
-  // show the "Daily" badge when goal.repeatsDaily
+  // show schedule metadata from GoalSchedule.label(goal)
   // attach the shared … menu with Edit/Delete and Pause/Resume actions
   // append card
 });
@@ -350,8 +362,8 @@ completion, undo, type changes and deletion stay correct without extra state. Th
 counter deliberately ignores the search filter and always reflects the whole column.
 The dashboard has one column per type (`STEPS`, `QUESTS`, `ARCS`) and the skill page
 nests the same goals under their Arc or Quest. Both views use
-`createGoalActionsMenu()` for Edit/Delete and own-status Pause/Resume. A repeating goal is marked with a `↻ Daily`
-badge in both places; the skill-page tree keeps its hierarchy order and has no counter.
+`createGoalActionsMenu()` for Edit/Delete and own-status Pause/Resume. Schedule badges describe Daily, Weekly or Custom recurrence and optional time
+(the daily compatibility case uses `↻ Daily`); the skill-page tree keeps its hierarchy order and has no counter.
 Browser check: `STATISTICS_TEST_SCRIPT=goals-order-browser.js python3 tests/statistics-browser.py webkit`.
 
 No explicit server `GET` request exists because this version has no backend.
@@ -399,8 +411,9 @@ adds or subtracts its XP:
 toggleGoalCompletion(id, true);
 ```
 
-Repeating goals automatically clear `completed` and `completedDay` on the next local
-calendar day without subtracting earned XP. This runs on render (including loading
+Daily goals clear `completed`, `completedDay` and `activeCompletionId` on the next local
+day; weekly/custom goals clear them on their next selected day. Neither reset subtracts XP.
+An early reminder completion for tomorrow survives tonight’s reset. This runs on render (including loading
 local or cloud data), at local midnight, and when returning to the page. A periodic
 clock check also handles timezone changes. Non-repeating goals keep their completion.
 
@@ -496,11 +509,14 @@ function render() {
   renderSkills();
   statisticsView?.render();
   if (isSkillPage) renderGoalTree();
-  else renderGoals();
+  else { renderGoals(); renderJourney(); }
+  reminderSystem?.refresh();
 }
 ```
 
-CRUD functions modify state rather than manually changing many separate DOM nodes.
+The real render path also normalizes `state.journey` for the current day and saves changed
+selections/order with `maintenance: true`. CRUD functions modify state rather than manually
+changing many separate DOM nodes.
 
 Example:
 
@@ -554,13 +570,15 @@ Profile XP is the sum of all skill XP. Goal XP is awarded to the linked skill on
 const totalXP = skills.reduce((sum, s) => sum + s.xp, 0);
 ```
 
-The type of a goal never changes what it pays out. XP is stored on the goal, so editing a
-step into an arc, completing a repeating goal twice on different days, or un-completing a
-goal manually all move exactly the same amount of XP. The automatic daily reset preserves
-earned XP, so completing a repeating goal on a new day awards XP again. Completing any
-goal counts toward the daily streak, whatever its type.
+Goal type does not determine the reward: each new completion awards the Goal's configured
+XP to its linked Skill and records the actual amount as `xpAwarded`, with the Skill ID and
+`goalType` at completion. Manual undo removes that record and reverses its original reward
+and Skill, even if the Goal has since been edited. Only legacy checked Goals without a
+linked record fall back to the current reward/Skill. Recurrence resets preserve earned XP;
+a later completion creates a separate reward event. Completing any Goal counts toward the
+streak. Existing Skill balances can include XP earned before history tracking began.
 
-Progression is exponential: reaching level N requires (N-1)^2 * 100 total XP.
+Progression is quadratic: reaching level N requires (N-1)^2 * 100 total XP.
 
 ```js
 function getLevelInfo(xp) {
@@ -674,8 +692,10 @@ Each newly recorded completion adds one fact to `state.completionHistory`:
   id: "completion-uuid",
   goalId: "goal-uuid",
   skillId: "skill-that-received-xp",
+  goalType: "step", // completion-time role; missing/invalid on old records means Unclassified
   completionDate: "2026-10-04", // logical local calendar date
   xpAwarded: 30
+  // occurrenceKey is also present when completed through a reminder.
 }
 ```
 
@@ -697,7 +717,11 @@ uncategorizes its Skills without touching Goals, XP or history.
 `Statistics.weekly(state, monday)` filters completion dates into a Monday-inclusive,
 next-Monday-exclusive range, then calculates:
 
-- **Weekly Activity:** record counts for seven calendar days, including zero-XP completions.
+- **Weekly Activity:** record counts for seven calendar days, including repeated events and
+  zero-XP completions. Each day returns `count` plus `types: { step, quest, arc, unclassified }`
+  from the recorded `goalType`; current Goal roles never reclassify old records.
+- **Weekly summary:** total event count and `earned`, the sum of recorded rewards including
+  records referencing absent Skills, independent of the top-five ranking.
 - **Top Skill Progression:** sums of `xpAwarded` by Skill, sorted by earned XP; the view shows
   up to five Skills with positive weekly XP. Uncategorized Skills participate normally.
 - **Life Areas:** current Area assignments group weekly Skill XP. Each percentage is Area XP
@@ -794,7 +818,8 @@ STATISTICS_TEST_SCRIPT=statistics-polish-browser.js STATISTICS_REDUCED_MOTION=1 
 ```
 
 These check entry and interrupted week transitions, summaries, zero/untracked states,
-uncategorized rewards, 3/4/6/8/9 Areas, long names, overflow, and unchanged application data.
+uncategorized rewards, stacked proportions, recurring events, keyboard tooltips/Escape,
+3/4/6/8/9 Areas, long names, overflow, and unchanged application data.
 
 ## Goals page visual hierarchy
 
