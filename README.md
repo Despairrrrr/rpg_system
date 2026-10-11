@@ -39,6 +39,9 @@ See [AGENTS.md](AGENTS.md) and the [current interface contract](CRUD.md#current-
 Start with today's scheduled Steps and Quests, or use **+ Add a Goal** to select an
 existing goal or create one. Expand Quests to complete their child Steps. The × hides
 any goal, including a nested Step, for today; add it again through the picker whenever plans change.
+Hiding a completed Goal keeps it in today’s completed/total summary and progress bar.
+Hiding an unfinished Goal removes it from the total. Undo elsewhere removes a hidden
+completion from the summary; restoring it never counts it twice.
 Choose **All Tasks** for a unified list or **Journey & Routine** to separate manually
 chosen goals from automatic recurring tasks. A manually selected routine appears once,
 in Journey; child Steps stay beneath their visible Quest. Both views share the same count.

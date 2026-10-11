@@ -51,6 +51,12 @@ Completion and undo reuse `toggleGoalCompletion()`, including history, streaks, 
 XP, level feedback and progress animation. Completed goals stay visible in their existing
 position, including inside Quests, so completion never rearranges the list. The summary
 counts distinct top-level goals only and does not change when switching views.
+`journeySummary()` also retains hidden completed Goals in both completed and total counts;
+hidden unfinished Goals are excluded. Retained Quests still group their Steps for summary
+purposes, preventing double counting when hiding a Quest exposes a child row. Counts are
+derived from current completion state and date-scoped `hiddenIds`, not stored separately.
+Undo from Goals or the Skill page removes a hidden completion from the summary. Restoring
+a Goal through the picker does not duplicate it; the next day clears hidden membership.
 
 **All Tasks** defaults to **By time**: today's explicit times ascend chronologically,
 with an **Anytime** group after them. Equal times use creation timestamp, then stable ID.

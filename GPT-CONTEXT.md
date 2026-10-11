@@ -30,7 +30,7 @@ statistics-model.js?v=2          — глобальный Statistics
 statistics.js?v=6                — createStatisticsView({getState, save}); null без #statisticsPage (поэтому безопасен на skill.html)
 schedule-model.js?v=4            — глобальный GoalSchedule
 reminders.js?v=2                 — createReminderPanel, createReminderSystem, createBrowserReminders
-app.js?v=20                      — всё приложение
+app.js?v=21                      — всё приложение
 styles.css?v=19                  — на всех трёх страницах
 ```
 
@@ -223,7 +223,10 @@ state = {
 - By time сортирует по времени, относящемуся к сегодняшнему дню, затем `createdAt` и ID;
   без времени — Anytime. My order в All Tasks использует доступные кнопки вверх/вниз и
   `orderIds`. Split-view сортируется по времени. Завершение не переставляет строки.
-- × скрывает Goal только на сегодня; picker может вернуть его. Ручные selected/hidden/order
+- × скрывает Goal только на сегодня; picker может вернуть его. `journeySummary()` сохраняет
+  скрытые выполненные Goals в completed/total, исключает скрытые невыполненные и не считает
+  дочерние Steps повторно вместе с Quest. Undo убирает скрытое завершение из сводки;
+  возврат через picker не дублирует счётчик. Ручные selected/hidden/order
   очищаются при смене локального дня; `viewMode` / `sortMode` сохраняются. Новые Goals
   из Today создаются обычным CRUD и одновременно выбираются на сегодня.
 - `GoalSchedule.isEffectivelyActive()` учитывает всю цепочку родителей, не меняя статус

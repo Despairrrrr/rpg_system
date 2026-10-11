@@ -324,6 +324,19 @@ function journeyGoals(goals, journey, now = new Date()) {
     .sort((a, b) => Number(Boolean(a.completed)) - Number(Boolean(b.completed)));
 }
 
+// Hiding a checked Goal removes its row, not its contribution to today's progress.
+// Reuse top-level membership so nested Steps are not counted twice with their Quest.
+function journeySummary(goals, journey, now = new Date()) {
+  const today = normalizeJourney(journey, goals, GoalSchedule.dayKey(now));
+  const retained = new Set(goals.filter(goal => goal.completed && today.hiddenIds.includes(goal.id)).map(goal => goal.id));
+  const counted = journeyGoals(goals, {
+    ...today,
+    selectedIds: [...today.selectedIds, ...retained],
+    hiddenIds: today.hiddenIds.filter(id => !retained.has(id)),
+  }, now);
+  return { total: counted.length, done: counted.filter(goal => goal.completed).length };
+}
+
 function journeyChildren(goal, goals, journey) {
   const today = normalizeJourney(journey, goals);
   return goals.filter(child => child.type === 'step' && child.parentGoalId === goal.id &&
@@ -2318,11 +2331,11 @@ function renderJourney() {
   document.getElementById('journeySort').hidden = journey.viewMode !== 'all';
   document.getElementById('journeyOrderHint').hidden = !manual;
   list.replaceChildren();
-  const done = goals.filter(goal => goal.completed).length;
+  const { done, total } = journeySummary(state.goals, journey, now);
   document.getElementById('journeyDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  document.getElementById('journeySummary').textContent = `${done} of ${goals.length} completed${goals.length && done === goals.length ? ' · All done for today' : ''}`;
+  document.getElementById('journeySummary').textContent = `${done} of ${total} completed${total && done === total ? ' · All done for today' : ''}`;
   const progress = document.getElementById('journeyProgress');
-  progress.max = goals.length || 1;
+  progress.max = total || 1;
   progress.value = done;
   if (!goals.length && journey.viewMode === 'all') {
     const empty = journeyElement('div', 'journey-empty panel');

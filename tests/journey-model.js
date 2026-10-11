@@ -3,7 +3,7 @@ const read = name => typeof require === 'function' ? require('fs').readFileSync(
 const GoalSchedule = eval(read('schedule-model.js') + '\nGoalSchedule;');
 const Statistics = eval(read('statistics-model.js') + '\nStatistics;');
 const source = read('app.js');
-const api = eval(source.slice(source.indexOf('function normalizeJourney('), source.indexOf('function migrateState(')) + '\n({ normalizeJourney, journeyGoals, journeyTime, orderJourneyGoals, journeySections });');
+const api = eval(source.slice(source.indexOf('function normalizeJourney('), source.indexOf('function migrateState(')) + '\n({ normalizeJourney, journeyGoals, journeySummary, journeyTime, orderJourneyGoals, journeySections });');
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const monday = new Date(2026, 9, 5, 23, 59, 59);
 const goals = [
@@ -62,3 +62,29 @@ const malformed=api.normalizeJourney({date:today,viewMode:'bad',sortMode:{},orde
 assert(malformed.viewMode==='all' && malformed.sortMode==='time' && !malformed.orderIds.length, 'safe presentation defaults');
 assert(JSON.stringify(api.normalizeJourney(preferences,timed,today))===JSON.stringify(preferences), 'presentation migration idempotent');
 (typeof print==='function'?print:console.log)('PASS: Journey views, time relevance, deterministic ties, manual ordering, stable completion and daily preference normalization');
+
+const progressGoals = [
+  {id:'done',type:'step',completed:true,status:'paused'},
+  {id:'open',type:'step',completed:false},
+];
+const progressSelection = {date:today,selectedIds:['done','open'],hiddenIds:[]};
+const progress = (selection=progressSelection, date=monday) => api.journeySummary(progressGoals,selection,date);
+assert(progress().done===1 && progress().total===2,'visible progress baseline');
+progressSelection.selectedIds=['open']; progressSelection.hiddenIds=['done'];
+assert(progress().done===1 && progress().total===2,'hidden completed manual/paused Goal retains both counts');
+assert(api.journeyGoals(progressGoals,progressSelection,monday).length===1,'retained completion does not restore row');
+progressSelection.selectedIds=[]; progressSelection.hiddenIds=['done','open'];
+assert(progress().done===1 && progress().total===1,'hidden unfinished Goal excluded');
+assert(progress({...progressSelection,selectedIds:['done'],hiddenIds:['open']}).total===1,'restoring completed Goal never double counts');
+assert(progress(progressSelection,tuesday).total===0,'retention ends with date-scoped hiding');
+progressGoals[0].completed=false;
+assert(progress().done===0 && progress().total===0,'undo elsewhere removes hidden completion from both counts');
+const nested=[{id:'q',type:'quest',completed:true,schedule:{type:'daily'}},{id:'c',type:'step',completed:true,parentGoalId:'q',schedule:{type:'daily'}}];
+const nestedSelection={date:today,hiddenIds:['c']};
+assert(api.journeySummary(nested,nestedSelection,monday).total===1,'hidden nested Step not counted twice');
+nestedSelection.hiddenIds=['q'];
+assert(api.journeySummary(nested,nestedSelection,monday).total===1,'retained Quest remains summary parent when its child becomes visible');
+const snapshot=JSON.stringify([nested,nestedSelection]);
+api.journeySummary(nested,nestedSelection,monday);
+assert(snapshot===JSON.stringify([nested,nestedSelection]),'summary derives counts without mutation or stored totals');
+(typeof print==='function'?print:console.log)('PASS: hidden completed/unfinished Goals, restore, undo, rollover and nested summary counts');
