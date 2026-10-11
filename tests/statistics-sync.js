@@ -4,6 +4,7 @@ const read = name => typeof require === 'function' ? require('fs').readFileSync(
 const source = read('app.js');
 const Statistics = eval(read('statistics-model.js') + '\nStatistics;');
 const GoalSchedule = eval(read('schedule-model.js') + '\nGoalSchedule;');
+const JourneyForecast = eval(read('journey-forecast-model.js') + '\nJourneyForecast;');
 const migrate = eval(source.slice(source.indexOf('// <goal-model>'), source.indexOf('// </goal-model>')) + '\nmigrateState;');
 function assert(ok, message) { if (!ok) throw new Error(message); }
 function section(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
@@ -41,9 +42,11 @@ async function run() {
   state.completionHistory.push({ id: 'r', goalId: 'g', skillId: 's', completionDate: Statistics.dayKey(), xpAwarded: 10 });
   Statistics.createArea(state, 'a', 'Learning', ['s']);
   state.journey = {date:Statistics.dayKey(),selectedIds:['once'],hiddenIds:[],orderIds:['once','scheduled'],viewMode:'split',sortMode:'manual'};
+  state.journeyForecast = {preferredEndTime:'21:30',activeDate:Statistics.dayKey()};
   api.saveState();
   await api.pushToCloud();
   const sent = JSON.parse(writes[writes.length - 1].state);
+  assert(JSON.stringify(sent.journeyForecast) === JSON.stringify(state.journeyForecast), 'forecast settings use the same cloud document');
   assert(JSON.stringify(sent.journey) === JSON.stringify(state.journey), 'Journey preferences and order upload in the ordinary state document');
   assert(sent.goals[0].status === 'paused' && sent.goals[0].remindersResumeAt === 1791540000000, 'status and reminder cutoff uploaded in ordinary cloud document');
   assert(sent.goals[1].schedule.time === '18:00' && sent.oneTimeSchedules.once.day === '2026-10-09', 'one-time schedule and local date cloud round-trip');
@@ -56,6 +59,7 @@ async function run() {
   cloudReady = false;
   cloud = {updatedAt: state.updatedAt + 100, state: JSON.stringify(sent)};
   await api.pullFromCloud();
+  assert(state.journeyForecast.preferredEndTime === '21:30' && state.journeyForecast.activeDate === Statistics.dayKey(), 'active forecast survives remote migration');
   assert(state.journey.viewMode === 'split' && state.journey.sortMode === 'manual' && state.journey.orderIds.join() === 'once,scheduled', 'remote Journey preferences and order survive migration');
   assert(state.goals[0].status === 'paused' && state.goals[0].remindersResumeAt === 1791540000000 && state.goals[1].status === 'active', 'remote statuses migrate and preserve cutoff');
   cloudReady = false;

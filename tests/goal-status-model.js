@@ -2,6 +2,7 @@
 const read = name => typeof require === 'function' ? require('fs').readFileSync(name, 'utf8') : new TextDecoder().decode(imports.gi.GLib.file_get_contents(name)[1]);
 const Statistics = eval(read('statistics-model.js') + '\nStatistics;');
 const GoalSchedule = eval(read('schedule-model.js') + '\nGoalSchedule;');
+const JourneyForecast = eval(read('journey-forecast-model.js') + '\nJourneyForecast;');
 const source = read('app.js');
 const model = eval(source.slice(source.indexOf('// <goal-model>'), source.indexOf('// </goal-model>')) + '\n({migrateState, journeyGoals, journeyChildren});');
 const assert = (ok, message) => { if (!ok) throw new Error(message); };

@@ -3,7 +3,7 @@ const read = name => typeof require === 'function' ? require('fs').readFileSync(
 const Schedule = eval(read('schedule-model.js') + '\nGoalSchedule;');
 const app = read('app.js');
 const model = app.slice(app.indexOf('// <goal-model>'), app.indexOf('// </goal-model>'));
-const modelApi = (() => eval(read('statistics-model.js') + '\n' + model + '\n({ migrateState });'))();
+const modelApi = (() => eval(read('statistics-model.js') + '\n' + read('schedule-model.js') + '\n' + read('journey-forecast-model.js') + '\n' + model + '\n({ migrateState });'))();
 function assert(ok, message) { if (!ok) throw new Error(message); }
 const legacy = { updatedAt: 17, skills: [{ id: 's', xp: 123 }], goals: [
   { id: 'a', type: 'step', skillId: 's', repeatsDaily: true, completed: true, completedDay: '2026-10-09' },

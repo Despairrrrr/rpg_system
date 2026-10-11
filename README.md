@@ -15,6 +15,8 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 - `statistics-model.js` — completion-history migration, local calendar weeks, weekly aggregations and Life Area operations.
 - `statistics.js` — Statistics view, shared week picker, charts and Life Area management.
 - `schedule-model.js` — schedule validation, recurrence and local reminder times.
+- `journey-forecast-model.js` — pure workload, duration, local deadline and forecast calculations.
+- `journey-forecast.js` — compact Today forecast UI using the existing minute/resume lifecycle.
 - `reminders.js` — reminder panel, minute checks and optional browser notifications.
 - `login.js` — login page logic, kept separate from `app.js` (which needs the full dashboard DOM).
 - `firebase.init.js` — Firebase configuration + initialization (paste your `firebaseConfig` here).
@@ -61,6 +63,28 @@ and reminders. Descendants inherit the pause without changing their own statuses
 Resume restores scheduling while keeping independently paused children paused; reminders
 due before resume do not return as a backlog. Paused goals can still be manually selected
 for Today and completed normally. The × remains a separate removal for today only.
+
+## Journey Forecast
+
+Below Today's progress, choose when you want to finish and press **Calculate**. The collapsible
+panel keeps an approximate percentage, risk label and target visible. **Edit target** applies a
+change immediately while active. Your preferred time is remembered across days, but each new
+local day requires a fresh activation. An expired target shows **Time’s up**: choose a later time
+and restart. Completing all applicable goals hides the percentage; adding work makes it available again.
+
+This is a planning heuristic, not a statistically validated probability. It uses 75% of the remaining
+clock time and `P = 100 × T² / (T² + W²)`, where T is usable minutes and W is remaining estimated work.
+Steps take 5 minutes at 10 XP, 15 at 125 XP, otherwise 10. Quests use 105/180/210 minutes for
+200/350/500 XP; custom XP uses the nearest preset, with ties toward the lower XP.
+Unfinished included Quests cover their child Steps without partial reduction. Other included Steps
+count independently; Arcs, completed goals and goals hidden from Today contribute no workload.
+A remaining included Step counts separately when its Quest is absent or completed.
+
+Green **Good outlook** (75–100%), yellow **At risk** (40–74%) and red **High risk** (0–39%)
+follow the displayed rounded percentage. Updates share the existing minute and tab-resume lifecycle,
+without minute-by-minute state writes. Goal changes recalculate immediately; view/order switches do
+not affect work. Settings use the existing localStorage/Firebase mirror. Forecasting changes no XP,
+completion history or goal schedules. See [implementation details](CRUD.md#journey-forecast).
 
 ## Run
 
@@ -225,7 +249,7 @@ JSON string. Clearing it is **Delete photo** in the avatar menu.
 The site is purely static — no server needed:
 
 1. Put `index.html`, `login.html`, `skill.html`, `app.js`, `statistics-model.js`, `statistics.js`,
-   `schedule-model.js`, `reminders.js`, `login.js`, `firebase.init.js`, `styles.css` and `assets/` into a repo root (or move them
+   `schedule-model.js`, `journey-forecast-model.js`, `journey-forecast.js`, `reminders.js`, `login.js`, `firebase.init.js`, `styles.css` and `assets/` into a repo root (or move them
    into the repo root from the `front/` folder).
 2. GitHub repo → **Settings → Pages → Build and deployment → Deploy from a branch →
    main / root.**
@@ -322,9 +346,13 @@ stacked weekly statistics changes:
 
 ```sh
 gjs tests/journey-model.js
+gjs tests/journey-forecast-model.js
+TZ=America/New_York gjs tests/journey-forecast-model.js
 gjs tests/goal-status-model.js
 gjs tests/statistics-model.js
 gjs tests/statistics-sync.js
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=statistics-stacks-browser.js python3 tests/statistics-browser.py webkit

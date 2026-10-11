@@ -10,6 +10,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 |---|---|---|
 | Top navigation | **Today's Journey** → **Goals** → **Statistics**; no Skills tab | `index.html`, navigation handler in `app.js` |
 | Today presentation | Compact All Tasks / Journey & Routine views; chronological time groups or date-scoped My order; both share Goal membership and rewards | `renderJourney()`, `journeySections()`, `state.journey` |
+| Journey Forecast | Collapsible heuristic below Today progress; remembered target, explicit daily activation, live percentage, immediate active edits, explicit restart after expiry | `journey-forecast-model.js`, `journey-forecast.js`, `journeyForecastGoals()`, `state.journeyForecast` |
 | Goal scheduling | Step/Quest One-time and Repeating both show optional Time; only Repeating shows frequency/days. Reminders require a time | `index.html`, `skill.html`, `app.js`, `schedule-model.js` |
 | Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
 | Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
@@ -92,6 +93,49 @@ goals. Creation uses the ordinary Goal dialog limited to Step/Quest and atomical
 the new ID on save; Quest cards offer Add Step with the parent preselected. Cancellation
 never writes a selection. Skill creation remains in the shared Skills panel.
 
+## Journey Forecast
+
+The compact native disclosure below Today progress keeps its percentage, risk label and target
+visible while collapsed. Choose a local time and Calculate; Edit target applies changes immediately
+while active. On expiry with work left, show Time’s up without extending the deadline. Choose a later
+time and Calculate to restart. Empty work hides the percentage but keeps the control available.
+
+`state.journeyForecast = { preferredEndTime: "21:00", activeDate: "" }` is the default.
+Activation records today's local date; changing the time remembers it. Migration retains activation
+only on the matching local date and defaults malformed time to 21:00/inactive. The next day retains
+the preference and requires activation again; an open tab expands the panel so Calculate is one interaction away. Settings use the ordinary state save/cloud mirror and
+rollback. Day normalization uses existing maintenance saves, preserving updatedAt. Expiry is derived,
+not repeatedly persisted; no stored probability, extra localStorage key or Firebase document.
+
+The pure `JourneyForecast` module depends on Statistics and GoalSchedule. Load it, then
+`journey-forecast.js`, after schedule-model and before app.js on both Goal pages. The view factory
+returns null on the Skill page. `journeyForecastGoals()` reuses Journey roots and nested children,
+including collapsed rows; it does not use the summary's retained hidden completions. Work is deduplicated
+by ID and independent of presentation/order. Include today's automatic recurrences and manual selections
+(including paused); exclude hidden, absent, completed and Arc goals. Unfinished included Quests cover
+all their Steps without partial reduction. When the parent is absent or completed, a remaining included
+Step contributes separately. Step/Quest goals beneath Arcs count normally.
+
+| Work | Estimated minutes |
+|---|---|
+| Step: 10 XP / 125 XP / other valid XP | 5 / 15 / 10 |
+| Quest: 200 XP / 350 XP / 500 XP | 105 / 180 / 210 |
+| Quest: custom XP | Nearest preset; ties choose lower XP (275 → 105 min, 425 → 180 min) |
+
+Valid XP is a finite nonnegative integer (numeric strings accepted); invalid counted XP shows Check goal XP.
+`AVAILABLE_TIME_FACTOR = 0.75`; `T = max(0, minutes until local target) × factor`, `W = remaining
+estimated minutes`, `P = 100*T²/(T²+W²)`. Computation stays real-valued and display rounds/clamps 0–100.
+Displayed 75–100 = green Good outlook; 40–74 = yellow At risk; 0–39 = red High risk.
+This is an approximate heuristic, not a calibrated probability. Local deadlines use native Date/DST
+semantics and never silently move to tomorrow. Inactive, completed, expired and unavailable states hide P.
+
+`updateJourneyForecast()` handles settings; `createJourneyForecastView()` updates stable panel DOM.
+The existing reminder lifecycle refreshes it roughly every minute, after Goal changes/render and on
+focus/pageshow/visibility/storage. It uses actual time, adds no timer and writes no state for percentage
+updates. Goal addition/removal/completion/undo/XP/parent edits affect the next render. Forecast never
+changes rewards, completion history, reminders or Statistics. Keyboard focus and time drafts survive
+refresh; disclosure motion respects reduced-motion preferences.
+
 ## Active / Paused Goals
 
 Every role stores `status: "active" | "paused"`, independent of completion. New Goals
@@ -148,6 +192,7 @@ The application keeps one `state` object:
   streak: { count: 0, date: "" },
   journey: { date: "2026-10-04", selectedIds: [], hiddenIds: [], orderIds: [],
              viewMode: "all", sortMode: "time" },
+  journeyForecast: { preferredEndTime: "21:00", activeDate: "" },
   goals: [],
   skills: [],
   lifeAreas: [],
@@ -754,6 +799,8 @@ From `front/`, run:
 ```sh
 gjs tests/goal-status-model.js
 gjs tests/journey-model.js
+gjs tests/journey-forecast-model.js
+TZ=America/New_York gjs tests/journey-forecast-model.js
 gjs tests/goal-model.js
 gjs tests/daily-reset.js
 gjs tests/schedule-model.js
@@ -764,6 +811,10 @@ gjs tests/statistics-sync.js
 TZ=America/New_York gjs tests/statistics-model.js
 TZ=America/New_York gjs tests/schedule-model.js
 TZ=America/New_York gjs tests/reminders.js
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit 390 844
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
+GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
 GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit

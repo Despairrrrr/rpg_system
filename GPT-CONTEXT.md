@@ -1,7 +1,7 @@
 # Goal Tracker — полный контекст для передачи другой модели (GPT)
 
 Всё ниже написано **по коду** (app.js, страницы, модули, стили, тесты), а не по AGENTS.md/README.md.
-Контекст сверен с текущим кодом после коммита `e8c7461` (Improved Weekly Statistics).
+Контекст сверен с текущей реализацией, включая Journey Forecast и сохранение скрытых выполненных целей в сводке Today.
 Life History / Chronicles были отменены: их раздела, модулей и полей в текущей реализации нет.
 Скопируй этот файл целиком в модель как контекст перед задачей.
 
@@ -29,13 +29,17 @@ firebase.init.js?v=2            — инициализирует app тольк�
 statistics-model.js?v=2          — глобальный Statistics
 statistics.js?v=6                — createStatisticsView({getState, save}); null без #statisticsPage (поэтому безопасен на skill.html)
 schedule-model.js?v=4            — глобальный GoalSchedule
+journey-forecast-model.js?v=1    — глобальный JourneyForecast: чистые расчёты и нормализация
+journey-forecast.js?v=1          — createJourneyForecastView; null без #journeyForecast
 reminders.js?v=2                 — createReminderPanel, createReminderSystem, createBrowserReminders
-app.js?v=21                      — всё приложение
-styles.css?v=19                  — на всех трёх страницах
+app.js?v=22                      — всё приложение
+styles.css?v=20                  — на всех трёх страницах
 ```
 
 `login.html` грузит только firebase-app + firebase-auth + firebase.init + `login.js?v=2` (без Firestore).
-Порядок обязателен: `Statistics` → statistics.js; `GoalSchedule` → reminders.js и app.js.
+Порядок обязателен: `Statistics` → statistics.js; `Statistics` + `GoalSchedule` → JourneyForecast;
+модель Forecast → её UI и `migrateState()` в app.js; `GoalSchedule` → reminders.js и app.js.
+Model-тесты, вызывающие `migrateState()`, тоже должны загрузить модель Forecast после Statistics/GoalSchedule.
 
 **Тесты** (`tests/`, gjs/node): model-тесты вырезают DOM-free блок `// <goal-model> … // </goal-model>`
 из app.js или загружают отдельные модели и гоняют настоящий код:
@@ -43,6 +47,8 @@ styles.css?v=19                  — на всех трёх страницах
 ```
 gjs tests/goal-status-model.js
 gjs tests/journey-model.js
+gjs tests/journey-forecast-model.js
+TZ=America/New_York gjs tests/journey-forecast-model.js
 gjs tests/goal-model.js
 gjs tests/daily-reset.js
 gjs tests/schedule-model.js
@@ -58,6 +64,9 @@ TZ=America/New_York gjs tests/schedule-model.js   # и аналогично stat
 `CRUD.md` → Verification. Проверки новых возможностей:
 
 ```sh
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-forecast-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
+GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=statistics-stacks-browser.js python3 tests/statistics-browser.py webkit
@@ -95,6 +104,7 @@ state = {
   schemaVersion: 3,                  // добавляется миграцией
   journey: { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [], orderIds: [],
              viewMode: "all"|"split", sortMode: "time"|"manual" },
+  journeyForecast: { preferredEndTime: "21:00", activeDate: "" }, // activeDate = текущий локальный день после Calculate
   oneTimeSchedules?: { [goalId]: { day: "YYYY-MM-DD", configuredAt: ms } },
   reminderReceipts?: { [goalId]: { key, status: "done"|"skipped" } },
 }
@@ -247,6 +257,67 @@ state = {
   но сами цели не удаляет. Никогда не сбрасывать `neonGoalTracker.v1` ради нового фича,
   не выдумывать историю до начала трекинга.
 
+## Journey Forecast
+
+Компактная панель находится под прогрессом Today, перед переключателем All Tasks / Journey & Routine.
+Это приблизительная игровая оценка реалистичности плана, а не статистически проверенная вероятность.
+Нативное поле времени изначально показывает 21:00. Изменение поля запоминает предпочтение;
+Calculate активирует прогноз только для времени позже текущего и сворачивает панель.
+В свёрнутом виде остаются процент, текст риска и выбранный срок; Edit target раскрывает поле.
+Редактирование ещё активного срока сразу пересчитывает прогноз без второго Calculate.
+После истечения срока показано Time’s up; Set a new time позволяет выбрать более позднее время
+и явно запустить новый прогноз. Срок сам не продлевается, XP/history/выбор Today не меняются.
+
+Минимальный стейт: `journeyForecast: { preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | "" }`.
+Отдельные проценты, статус и deadline timestamp не хранятся. `JourneyForecast.normalize()` добавляет
+безопасные значения старым документам; невалидное время становится 21:00 с пустой activeDate.
+Активация сохраняется только для текущего локального дня. В новый день preferredEndTime остаётся,
+а activeDate очищается существующим maintenance-путём; панель раскрывается для запуска одним Calculate, без повышения updatedAt. Повторная миграция
+идемпотентна. Настройки проходят обычные localStorage/Firestore записи, storage-синхронизацию и rollback
+при ошибке записи. Перезагрузка в тот же день восстанавливает прогноз либо вычисляемое истечение.
+
+`journeyForecastGoals()` переиспользует `journeyGoals()` и `journeyChildren()`: действующий план Today,
+включая детей свёрнутых Quests, автоматические повторения на сегодня и ручной выбор (в том числе paused).
+Удалённые через × и отсутствующие в плане цели исключены. Это не `journeySummary()`: скрытые выполненные
+цели могут сохраняться в счётчике Today, но не добавляют работу. View/sort/order не влияют на результат.
+Дедупликация идёт по ID. Completed и сами Arcs исключены; их подходящие Step/Quest-потомки учитываются.
+Незавершённый включённый Quest покрывает свои Steps целиком: выполнение ребёнка не уменьшает оценку Quest.
+Если Quest отсутствует в прогнозе (в том числе уже выполнен), оставшийся включённый Step считается отдельно.
+
+Точные оценки в минутах:
+
+- Step: 10 XP → 5; 125 XP → 15; любое другое допустимое XP → 10.
+- Quest: 200 XP → 105; 350 XP → 180; 500 XP → 210. Кастомное XP выбирает ближайший пресет;
+  при равном расстоянии меньший XP (275 → 105 минут; 425 → 180 минут).
+- Допустимо конечное неотрицательное целое XP, включая числовую строку. Невалидное XP оставшейся
+  учитываемой цели даёт состояние unavailable / Check goal XP вместо NaN или ложного «всё готово».
+
+`AVAILABLE_TIME_FACTOR = 0.75` задан один раз в `journey-forecast-model.js`.
+`T = max(0, минуты до выбранного локального времени) × 0.75`, `W = сумма оценок оставшейся работы`.
+`P = 100 × T² / (T² + W²)` вычисляется эквивалентно через отношение W/T, без преждевременного округления.
+Только отображение округляется до целого; шкала ограничена 0–100. Цвет и подпись соответствуют
+отображённому числу: 75–100 Good outlook (зелёный), 40–74 At risk (жёлтый), 0–39 High risk (красный).
+Дата/время используют нативный локальный Date, включая его DST-семантику; переход на завтра не подразумевается.
+
+`JourneyForecast.calculate()` возвращает inactive, active, completed, expired или unavailable.
+Без активации процент скрыт; при нулевой работе — completed / No remaining goals с тем же скрытым процентом.
+Панель остаётся доступной, а добавление работы или undo снова вычисляет прогноз по сохранённому сроку.
+Expired выводится при оставшейся работе и достигнутом deadline, без штрафа или повторных записей.
+
+`createJourneyForecastView()` обновляет только собственные текст/атрибуты, сохраняя DOM, фокус,
+раскрытие и черновик времени. На skill.html возвращает null. `updateJourneyForecast()` в app.js
+синхронизирует состояние перед изменением настройки, сохраняет обычным путём и откатывает ошибку.
+Обновления используют существующий `createReminderSystem`: раз в 60 секунд, после render/CRUD,
+focus, pageshow, visibilitychange и storage; учитывают реальный Date.now после возвращения во вкладку.
+Новых интервалов нет; пересчёт процента не сохраняет состояние и не перерисовывает весь Journey.
+Шеврон использует токен анимации; reduced motion отключает переход. Цвет дополняется текстом.
+
+`tests/journey-forecast-model.js` проверяет оценки, членство/вложенность, формулу, сроки, миграцию,
+чистоту расчётов и локальные даты/DST. `tests/journey-forecast-browser.js` проверяет UI, lifecycle,
+completion/undo, смену дня, сохранение/ошибки, синхронизацию вкладок, мобильный экран и reduced motion,
+стабильность DOM/фокуса и единственный интервал. `tests/statistics-sync.js` проверяет перенос настроек
+через существующее облачное зеркало. Команды приведены в §2 и CRUD → Verification.
+
 ## 9. Технические ограничения для модели
 
 - Только ванильный JS; соблюдать глобалы и порядок загрузки (см. §2).
@@ -274,7 +345,8 @@ The repository contains: index.html (Today's Journey / Goals dashboard + Statist
 (skill detail, body[data-page="skill"], ?id=<skillId>), login.html + login.js (Google
 sign-in, open-redirect guard), app.js (state, CRUD, rendering, sync, auth, FX),
 statistics-model.js (global `Statistics`), statistics.js (createStatisticsView({getState, save})),
-schedule-model.js (global `GoalSchedule`), reminders.js (createReminderPanel,
+schedule-model.js (global `GoalSchedule`), journey-forecast-model.js (global `JourneyForecast`),
+journey-forecast.js (createJourneyForecastView), reminders.js (createReminderPanel,
 createReminderSystem, createBrowserReminders), styles.css (dark neon theme, --motion-* tokens),
 firebase.init.js, tests/ (gjs/node model tests that eval the DOM-free `// <goal-model>` block
 from app.js, plus isolated browser tests). Scripts load in a fixed order with ?v=N cache tokens
@@ -292,6 +364,7 @@ DATA MODEL:
 - profile: {name, photo (centre-cropped 256×256 JPEG data URL ≤150 KB, read only via
   readProfilePhoto(), never injected via innerHTML)}
 - journey: {date, selectedIds, hiddenIds, orderIds, viewMode: all|split, sortMode: time|manual}
+- journeyForecast: {preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | ""}; no stored percentage/status
 - optional: oneTimeSchedules {goalId:{day, configuredAt}}, reminderReceipts {goalId:{key,status}}
 - player XP = sum of skill XP (derived, never stored); level = floor(sqrt(xp/100))+1,
   threshold (L-1)²·100, span (2L-1)·100.
@@ -354,12 +427,30 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
 14. Life History/Chronicles is not part of this checked-out implementation. Its modules and
     chronicle snapshots are absent; adding them would be a separate product change.
 
+15. Journey Forecast stays below Today's progress and above the view switch. Preserve native time,
+    disclosure/keyboard focus, collapsed percentage and risk label, immediate active target edits,
+    explicit activation each local day and explicit restart after expiry. Keep preferredEndTime
+    across days; derive expiry/completed state without minute writes. Never extend deadlines or
+    change XP/history. Empty work hides the percentage; new work can restore it.
+    Use journeyForecastGoals() with existing Journey roots/children, not journeySummary() or DOM.
+    Exclude hidden/completed/Arc goals, deduplicate by ID; unfinished included Quests cover Steps
+    without partial reduction. A remaining included Step counts if its Quest is absent/completed.
+    Step XP 10/125/other valid → 5/15/10 minutes; Quest XP 200/350/500 → 105/180/210,
+    custom nearest preset with ties toward lower XP. T = remaining minutes × AVAILABLE_TIME_FACTOR
+    (0.75); P = 100*T²/(T²+W²). This is a heuristic, not a calibrated probability. Display-rounded
+    75+/40+/below40 maps to Good outlook/At risk/High risk. Invalid XP fails gracefully.
+    Reuse the reminder lifecycle's single minute timer/resume hooks. Forecast UI updates only
+    its own stable DOM. Normalization is idempotent; settings use existing sync and rollback.
+
 CONSTRAINTS:
 - Vanilla JS only. Globals and load order matter: firebase compat → firebase.init →
-  statistics-model → statistics → schedule-model → reminders → app.js (same on both pages).
+  statistics-model → statistics → schedule-model → journey-forecast-model → journey-forecast → reminders → app.js (same on both pages).
 - Check BOTH goal render paths and both pages when changing goal interactions.
 - Use native <dialog>.showModal() for modals and browser confirm()/alert() for delete/guards
   (that is the current convention).
+- Run `gjs tests/journey-forecast-model.js` and its America/New_York variant, plus
+  `STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit`
+  (also mobile/reduced-motion and skill.html), when modifying Forecast.
 - Run the relevant tests after changes: `gjs tests/goal-status-model.js`, `gjs tests/journey-model.js`,
   `gjs tests/goal-model.js`, `gjs tests/daily-reset.js`,
   `gjs tests/schedule-model.js`, `gjs tests/reminders.js`, `gjs tests/statistics-model.js`,

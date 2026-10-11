@@ -337,8 +337,8 @@ function journeySummary(goals, journey, now = new Date()) {
   return { total: counted.length, done: counted.filter(goal => goal.completed).length };
 }
 
-function journeyChildren(goal, goals, journey) {
-  const today = normalizeJourney(journey, goals);
+function journeyChildren(goal, goals, journey, now = new Date()) {
+  const today = normalizeJourney(journey, goals, GoalSchedule.dayKey(now));
   return goals.filter(child => child.type === 'step' && child.parentGoalId === goal.id &&
     !today.hiddenIds.includes(child.id) &&
     (today.selectedIds.includes(child.id) || GoalSchedule.isEffectivelyActive(child, goals)));
@@ -381,6 +381,14 @@ function journeySections(goals, journey, oneTimeSchedules, now = new Date()) {
   ];
 }
 
+// Include collapsed child rows too; the forecast model removes completed work and
+// Steps represented by an unfinished Quest. Summary-only hidden completions stay out.
+function journeyForecastGoals(goals, journey, now = new Date()) {
+  const roots = journeyGoals(goals, journey, now);
+  return roots.flatMap(goal => goal.type === 'quest'
+    ? [goal, ...journeyChildren(goal, goals, journey, now)] : [goal]);
+}
+
 function migrateState(loaded) {
   loaded = Statistics.normalize(loaded);
   const goals = migrateGoals(loaded.goals ?? []);
@@ -389,6 +397,7 @@ function migrateState(loaded) {
     schemaVersion: SCHEMA_VERSION,
     goals,
     journey: normalizeJourney(loaded.journey, goals),
+    journeyForecast: JourneyForecast.normalize(loaded.journeyForecast),
   };
 }
 // </goal-model>
@@ -566,8 +575,10 @@ function render() {
 
   resetRepeatingGoals();
   const journey = normalizeJourney(state.journey, state.goals);
-  if (JSON.stringify(journey) !== JSON.stringify(state.journey)) {
+  const forecast = JourneyForecast.normalize(state.journeyForecast);
+  if (JSON.stringify(journey) !== JSON.stringify(state.journey) || JSON.stringify(forecast) !== JSON.stringify(state.journeyForecast)) {
     state.journey = journey;
+    state.journeyForecast = forecast;
     saveState({ maintenance: true });
   }
   renderedDay = getDayKey();
@@ -2155,6 +2166,23 @@ function renderGoalState(
       : "";
 }
 
+
+// Only explicit settings/activation edits write Forecast state. Expiry and scores
+// are derived; the ordinary day maintenance path clears yesterday's activation.
+function updateJourneyForecast(time, activate) {
+  syncStoredProgress();
+  if (!GoalSchedule.validTime(time)) return false;
+  const now = new Date();
+  if (activate && JourneyForecast.deadline(time, now) <= now.getTime()) return false;
+  const previous = structuredClone(state);
+  const settings = JourneyForecast.normalize(state.journeyForecast);
+  const stillActive = settings.activeDate && JourneyForecast.deadline(settings.preferredEndTime, now) > now.getTime();
+  const next = { preferredEndTime: time, activeDate: activate || stillActive ? getDayKey() : '' };
+  if (JSON.stringify(next) === JSON.stringify(state.journeyForecast)) return true;
+  state.journeyForecast = next;
+  if (!saveState()) { state = previous; return false; }
+  return true;
+}
 
 // Today's Journey is a view over Goals, with date-scoped selection only.
 function changeJourneySelection(id, include) {
@@ -4573,6 +4601,12 @@ const statisticsView = createStatisticsView({
   save: () => { saveState(); render(); },
 });
 
+const forecastView = createJourneyForecastView({
+  getState: () => state,
+  getPlan: now => journeyForecastGoals(state.goals, state.journey, now),
+  update: updateJourneyForecast,
+});
+
 browserReminders = createBrowserReminders({ getState: () => state, navigate: navigateToGoal });
 
 reminderPanel = createReminderPanel({
@@ -4585,7 +4619,7 @@ reminderSystem = createReminderSystem({
   getState: () => state,
   save: saveState,
   complete: entry => toggleGoalCompletion(entry.goal.id, true, null, entry),
-  render: entries => { reminderPanel.render(entries); browserReminders.refresh(entries); },
+  render: entries => { reminderPanel.render(entries); browserReminders.refresh(entries); forecastView?.render(); },
   beforeCheck: () => { syncStoredProgress(); refreshLocalDay(); },
 });
 

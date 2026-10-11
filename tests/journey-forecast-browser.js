@@ -1,0 +1,94 @@
+// Isolated browser fixture via the existing statistics runner; Firebase is omitted.
+(async () => {
+  const NativeDate=Date;
+  let clock=new NativeDate(2026,9,12,15).getTime();
+  window.Date=class extends NativeDate { constructor(...args){super(...(args.length?args:[clock]));} static now(){return clock;} };
+  const $=id=>document.getElementById(id);
+  const assert=(ok,message)=>{if(!ok)throw new Error(message);};
+  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const result=document.createElement('pre');result.id='test-result';result.hidden=true;
+  const originalSet=Storage.prototype.setItem;
+  const originalInterval=window.setInterval;
+  let writes=0,intervals=0;
+  Storage.prototype.setItem=function(key,value){if(key===STORAGE_KEY)writes++;return originalSet.call(this,key,value);};
+  window.setInterval=function(callback,delay,...args){intervals++;return originalInterval(callback,delay,...args);};
+  const time=value=>{$('forecastEndTime').value=value;$('forecastEndTime').dispatchEvent(new Event('change',{bubbles:true}));};
+  const calculate=()=>{$('forecastForm').requestSubmit();};
+  const advance=(day,hour,minute=0)=>{clock=new NativeDate(2026,9,day,hour,minute).getTime();reminderSystem.refresh();};
+  const number=()=>Number($('forecastPercent').textContent.replace('%',''));
+  try{
+    const today=Statistics.dayKey();
+    state=migrateState({updatedAt:19,profile:{name:'Tester'},streak:{count:0,date:''},skills:[{id:'math',name:'Math',xp:0}],goals:[1,2,3].map(n=>({id:`s${n}`,type:'step',title:`Goal ${n}`,description:'',skillId:'math',parentGoalId:'',xp:125,schedule:{type:'daily'},completed:false,createdAt:new Date().toISOString()}))});
+    saveState();render();
+    reminderSystem.stop();reminderSystem.start();reminderSystem.start();
+    assert(intervals===1,'existing reminder timer is idempotent; no forecast timer');
+    if(isSkillPage){
+      assert(forecastView===null && !$('journeyForecast'),'shared modules safely omit absent forecast UI');
+      state.journeyForecast={preferredEndTime:'16:00',activeDate:today};saveState();
+      document.querySelector('.goal-tree-item[data-id="s1"] input').click();
+      assert(state.completionHistory.length===1 && state.journeyForecast.activeDate===today,'Skill tree rewards preserve Forecast setting');
+      advance(13,10);assert(state.journeyForecast.activeDate==='' && state.journeyForecast.preferredEndTime==='16:00','Skill page also normalizes forecast day');
+      result.textContent='PASS: Skill page scripts, completion and forecast midnight maintenance';
+    }else{
+      const panel=$('journeyForecast');
+      assert(panel.open && panel.dataset.phase==='inactive' && $('forecastEndTime').value==='21:00','first-use panel and default time');
+      assert($('journeyProgress').compareDocumentPosition(panel)&Node.DOCUMENT_POSITION_FOLLOWING,'panel below progress');
+      const facts=()=>JSON.stringify([state.goals,state.skills,state.completionHistory,state.journey]);
+      const before=facts();time('16:00');calculate();
+      assert(panel.dataset.phase==='active' && number()===50 && panel.dataset.risk==='at-risk','activation formula and yellow risk');
+      assert(!panel.open && document.activeElement===$('forecastSummary') && !$('forecastPercent').hidden,'collapsed result visible with keyboard focus');
+      assert(facts()===before && state.journeyForecast.activeDate===today,'forecast activation never changes plan or rewards');
+      assert(JSON.parse(localStorage.getItem(STORAGE_KEY)).journeyForecast.preferredEndTime==='16:00','normal storage persistence');
+      $('forecastSummary').click();assert(panel.open,'native disclosure expands');
+      $('forecastSummary').click();assert(!panel.open,'native disclosure collapses');
+      $('forecastEdit').click();assert(panel.open && document.activeElement===$('forecastEndTime'),'edit control opens and focuses native time input');
+      time('15:30');assert(number()===20 && panel.dataset.risk==='high-risk','active edit immediately changes result/red');
+      time('17:00');assert(number()===80 && panel.dataset.risk==='good','active edit green without Calculate');
+      const timestamp=state.updatedAt, saved=writes, input=$('forecastEndTime'), summary=$('forecastSummary');
+      const top=$('journeyList').getBoundingClientRect().top;
+      advance(12,16);
+      assert(number()===50 && writes===saved && state.updatedAt===timestamp,'clock tick updates percentage with no state write');
+      assert(input===$('forecastEndTime') && summary===$('forecastSummary') && Math.abs($('journeyList').getBoundingClientRect().top-top)<1,'ticks preserve controls/focus/layout');
+      const viewValue=number();document.querySelector('[data-journey-view="split"]').click();assert(number()===viewValue,'split view invariant');
+      document.querySelector('[data-journey-view="all"]').click();document.querySelector('[data-journey-sort="manual"]').click();moveJourneyGoal('s1',1);assert(number()===viewValue,'sort/reorder invariant');
+      document.querySelector('#journeyList [data-goal-id="s1"] input').click();assert(number()>viewValue && state.completionHistory.length===1,'completion reduces workload');
+      document.querySelector('#journeyList [data-goal-id="s1"] .journey-remove').click();assert(number()>viewValue && state.skills[0].xp===125,'hiding completed Goal retains reward but never adds work');
+      changeJourneySelection('s1',true);toggleGoalCompletion('s1',false);assert(number()===viewValue,'restore and undo restore workload');
+      document.querySelector('#journeyList [data-goal-id="s3"] .journey-remove').click();assert(number()>viewValue,'removing unfinished Goal reduces workload');
+      changeJourneySelection('s3',true);updateGoal('s3',{xp:10});assert(number()>viewValue,'XP edit recalculates');updateGoal('s3',{xp:125});
+      state=loadState();render();assert(number()===50 && panel.dataset.phase==='active','reload restores same-day forecast');
+      const beforeExpiry=writes;advance(12,17);assert(panel.dataset.phase==='expired' && $('forecastPercent').hidden && state.journeyForecast.preferredEndTime==='17:00','deadline expires without extension');
+      reminderSystem.refresh();assert(writes===beforeExpiry,'expiration/repeated ticks never write');
+      $('forecastEdit').click();time('18:00');assert(panel.dataset.phase==='inactive' && !state.journeyForecast.activeDate,'expired forecast requires deliberate restart');calculate();assert(panel.dataset.phase==='active','restart later deadline');
+      for(const goal of state.goals)toggleGoalCompletion(goal.id,true);
+      assert(panel.dataset.phase==='completed' && $('forecastPercent').hidden,'completed plan hides percentage');
+      toggleGoalCompletion('s1',false);assert(panel.dataset.phase==='active','undo revives forecast before deadline');
+      const oldInput=$('forecastEndTime');oldInput.value='19:00';reminderSystem.refresh();assert(oldInput.value==='19:00','minute update preserves unsaved native input draft');
+      oldInput.dispatchEvent(new Event('change',{bubbles:true}));
+      const remote=structuredClone(state);remote.updatedAt=state.updatedAt+100;remote.journeyForecast={preferredEndTime:'20:00',activeDate:today};
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(remote));window.dispatchEvent(new StorageEvent('storage',{key:STORAGE_KEY}));assert($('forecastTarget').textContent==='Target: 20:00','remote stored settings refresh panel');
+      const snapshots=JSON.stringify([state.skills,state.completionHistory]);advance(13,9);
+      assert(panel.dataset.phase==='inactive' && $('forecastEndTime').value==='20:00' && !state.journeyForecast.activeDate,'next local day prefills preference but clears activation');
+      assert(snapshots===JSON.stringify([state.skills,state.completionHistory]),'midnight preserves rewards/history');
+      assert(panel.open && !$('forecastCalculate').hidden,'new day exposes Calculate without an extra expansion');
+      calculate();assert(panel.dataset.phase==='active','one interaction starts next day');
+      clock=new NativeDate(2026,9,13,20,30).getTime();window.dispatchEvent(new Event('focus'));
+      assert(panel.dataset.phase==='expired','return from suspension uses actual clock');
+      time('08:00');calculate();assert($('forecastError').textContent.includes('later today') && !state.journeyForecast.activeDate,'cannot start using past deadline');
+      time('22:00');calculate();
+      const rollback=JSON.stringify(state);
+      Storage.prototype.setItem=()=>{throw new Error('QuotaExceededError');};
+      time('23:00');assert(JSON.stringify(state)===rollback && $('forecastError').textContent.includes('Could not save'),'failed time save rolls back');
+      Storage.prototype.setItem=function(key,value){if(key===STORAGE_KEY)writes++;return originalSet.call(this,key,value);};
+      time('21:30');assert(!$('forecastError').textContent,'can retry after failed save');
+      assert(intervals===1,'interactions and repeated refreshes create no extra intervals');
+      if(matchMedia('(prefers-reduced-motion: reduce)').matches)assert(getComputedStyle(summary,'::before').transitionDuration==='0s','reduced motion disables disclosure rotation');
+      panel.open=false;await wait(100);
+      assert(document.documentElement.scrollWidth<=innerWidth,'mobile/desktop has no page overflow');
+      assert(!window.__browserErrors.length,'no browser errors');
+      result.textContent='PASS: Forecast activation/edit/expiry/restart, colours, completion/undo/XP, display modes, reload/sync, midnight, suspend, no timer writes/duplicates, rollback, responsive/reduced motion';
+    }
+  }catch(error){result.hidden=false;result.textContent='FAIL: '+error.message+'\n'+error.stack;}
+  finally{Storage.prototype.setItem=originalSet;window.setInterval=originalInterval;}
+  document.body.append(result);
+})();

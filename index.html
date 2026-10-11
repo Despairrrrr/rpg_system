@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=20" />
 </head>
 <body>
   <header class="topbar">
@@ -45,6 +45,21 @@
       <p id="journeyDate" class="field-hint"></p>
       <p id="journeySummary" role="status"></p>
       <progress id="journeyProgress" max="1" value="0" aria-label="Today's goal completion"></progress>
+      <section class="forecast-panel" aria-label="Journey Forecast">
+        <details id="journeyForecast" open>
+          <summary id="forecastSummary"><span class="forecast-title">Journey Forecast</span><span class="forecast-result" role="status" aria-atomic="true"><strong id="forecastPercent" hidden></strong><span id="forecastStatus">Choose a target</span></span></summary>
+          <div class="forecast-content">
+            <form id="forecastForm">
+              <label for="forecastEndTime" id="forecastPrompt">When do you want to finish today's goals?</label>
+              <div class="forecast-controls"><input type="time" id="forecastEndTime" value="21:00" required aria-describedby="forecastHint forecastError" /><button type="submit" class="secondary-btn" id="forecastCalculate">Calculate</button></div>
+              <p id="forecastError" class="form-error" role="alert"></p>
+            </form>
+            <p id="forecastDetails" class="field-hint"></p>
+            <p id="forecastHint" class="field-hint">A rough planning estimate, not a measured probability. Goal XP selects approximate durations; 25% of remaining time is reserved for interruptions.</p>
+          </div>
+        </details>
+        <div class="forecast-footer"><span id="forecastTarget">Finish today at your own pace</span><button type="button" id="forecastEdit" hidden>Edit target</button></div>
+      </section>
       <div class="journey-toolbar">
         <div class="journey-segments" role="group" aria-label="Today's Journey view">
           <button type="button" data-journey-view="all" aria-pressed="true">All Tasks</button>
@@ -430,7 +445,9 @@
   <script src="statistics-model.js?v=2"></script>
   <script src="statistics.js?v=6"></script>
   <script src="schedule-model.js?v=4"></script>
+  <script src="journey-forecast-model.js?v=1"></script>
+  <script src="journey-forecast.js?v=1"></script>
   <script src="reminders.js?v=2"></script>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>
