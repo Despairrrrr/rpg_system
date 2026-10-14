@@ -1801,7 +1801,7 @@ button:disabled { cursor: default; opacity: .4; }
 .skill-progression-row { margin-bottom: 21px; }
 .skill-progression-row:last-child { margin-bottom: 0; }
 .skill-progression .progression-track { margin-top: 8px; height: 6px; }
-.skill-progression .progression-bar { background: linear-gradient(90deg, var(--goal-step), var(--green)); box-shadow: 0 0 8px color-mix(in srgb, var(--sage) 15%, transparent); }
+.skill-progression .progression-bar { background: var(--green); box-shadow: none; }
 .progression-label { font-size: 13px; }
 .area-visualization { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 24px; align-items: center; }
 #areaRadar { width: min(100%, 460px); justify-self: center; }
@@ -2209,7 +2209,7 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .level-row strong { color: var(--gold-soft); }
 .progress, .progression-track { border-color: var(--border-soft); background: var(--bg-deep); }
 .progress-fill, .xp-fill { background: linear-gradient(90deg, var(--gold-dim), var(--gold), var(--gold-soft)); box-shadow: none; }
-.skill-fill { background: linear-gradient(90deg, var(--sage-dim), var(--sage)); }
+.skill-fill { background: var(--sage); }
 .skill-row { border-bottom-color: var(--border-soft); }
 .skill-name { color: var(--text); }
 .streak-badge__frame::before, .streak-badge__icon { filter: none; }
@@ -2233,7 +2233,7 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .progression-label a:hover { color: var(--gold-soft); }
 .activity-chart::before { border-color: var(--border-soft); background-image: linear-gradient(to top, var(--border-soft) 1px, transparent 1px); }
 .activity-bar, .area-color { box-shadow: none; }
-.skill-progression .progression-bar { background: linear-gradient(90deg, var(--sage-dim), var(--sage)); box-shadow: none; }
+.skill-progression .progression-bar { background: var(--sage); box-shadow: none; }
 .radar-grid { stroke: var(--border); }
 .radar-value { fill: color-mix(in srgb, var(--sage) 15%, transparent); stroke: var(--sage); filter: none; }
 .statistics-empty { border-color: var(--border); }
