@@ -1,8 +1,25 @@
-# Neon Goal Tracker — frontend CRUD demo
+# Wayfarer — frontend CRUD demo
 
 Vanilla **HTML + CSS + JavaScript** frontend based on the dashboard concept from the conversation.
 
 Works fully offline with `localStorage`. Optionally, Google sign-in syncs progress to **Firebase (Auth + Cloud Firestore)** so it can be opened from any device.
+
+## Visual skin
+
+Journey and Goals use warm parchment; the profile/Skills panels, Skill detail page
+and Statistics use the matching Midnight Archive palette. Existing layouts, labels,
+controls and application logic are preserved. `styles.css` follows the existing
+Statistics visibility attribute to theme the header and dialogs without new state.
+MedievalSharp is reserved for headings and the character name; body text, controls,
+Skills, metadata and numbers use the system UI font stack. MedievalSharp is bundled in `assets/fonts/` under the included SIL Open Font License;
+no font service or new JavaScript dependency is required. Corner artwork adapts the
+provided reference SVG paths; the existing five streak frames retain their geometry
+and animations with muted colors. The storage key remains `neonGoalTracker.v1`.
+
+Main-view navigation updates immediately and uses a single 220 ms CSS content fade
+with a matching background-color transition. Rapid switches cancel the prior fade;
+no timers, duplicate views, routing changes or persisted transition state are used.
+Reduced motion skips these effects. Statistics retains its pre-restyle 1320 px cap.
 
 ## Files
 
@@ -10,7 +27,7 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 - `index.html` — semantic structure, dashboard, dialogs and templates.
 - `login.html` — optional sign-in page with a single "Continue with Google" button.
 - `skill.html` — per-skill page: skill goal text and its goals rendered as a tree (no type columns).
-- `styles.css` — visual system, responsive layout, neon theme.
+- `styles.css` — visual system, preserved responsive layout, parchment journal and Midnight Archive themes.
 - `app.js` — state, rendering, CRUD logic, `localStorage` and cloud sync.
 - `statistics-model.js` — completion-history migration, local calendar weeks, weekly aggregations and Life Area operations.
 - `statistics.js` — Statistics view, shared week picker, charts and Life Area management.
@@ -158,7 +175,7 @@ creates the Firebase user, later ones just sign it in.
   (`READING LEVEL UP — Lv. 4 → Lv. 5`); two level-ups play one after the other. The one goal
   reward drives both bars, so nothing is counted twice. Durations live in the `--motion-*` tokens
   in `styles.css` and are reduced under `prefers-reduced-motion`.
-- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, cyan, teal, amber, and a premium red/gold crest at 14+ days); missing a day resets it at local 00:00. Completing any Goal counts, including a one-off Quest. The badge markup ships in the page HTML and `app.js` only swaps the tier class and the day count, so the badge still renders when a stale cached script fails to run.
+- Daily streak: completing at least one goal per day grows a game-style streak badge next to the profile name (flame + day count, with a more angular frame per tier: dormant, sage, muted teal, bronze, and a burgundy/gold crest at 14+ days); missing a day resets it at local 00:00. Completing any Goal counts, including a one-off Quest. The badge markup ships in the page HTML and `app.js` only swaps the tier class and the day count, so the badge still renders when a stale cached script fails to run.
 - Goal maintenance actions live behind one `···` trigger per goal card instead of permanent
   Edit/Delete buttons, which keeps the card quiet next to completion, title and XP. The menu is a
   single `position: fixed` element on `<body>` (`role="menu"`, `aria-haspopup` /
@@ -270,7 +287,7 @@ Run presentation-state checks from `front` with `gjs tests/streak-motion.js` or 
 
 ### Goals and Skills presentation
 
-Goal columns carry the strong neon accents; inner cards use softer borders. Steps are
+Goal columns carry the muted fantasy accents; inner cards use softer borders. Steps are
 compact, Quests medium, and Arcs slightly more spacious. Completed Goals are quieter and
 sort to the bottom of their column, XP is secondary to the title, and Skill/parent
 metadata uses compact wrapping tags. Skills
@@ -328,8 +345,8 @@ form (a browser permission granted during editing remains a browser setting).
 
 ### Weekly Activity completion types
 
-Weekly Activity stacks recorded completion events by Step (teal), Quest (purple) and
-Arc (orange), with a compact legend and daily mouse/keyboard tooltips. Escape dismisses
+Weekly Activity stacks recorded completion events by Step (muted teal), Quest (matte gold) and
+Arc (burgundy), with a compact legend and daily mouse/keyboard tooltips. Escape dismisses
 the tooltip. A neutral Unclassified segment preserves events without a valid historical
 type; their current Goal type is not evidence of the type at completion. New history
 records snapshot `goalType`; old records are preserved without guessing or backfilling.

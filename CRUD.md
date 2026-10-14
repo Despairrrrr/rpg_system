@@ -844,7 +844,7 @@ The compact overview aligns the title/week selector with a two-metric summary: c
 Goals and total weekly earned XP. XP includes uncategorized Skills and Skills beyond the
 five displayed ranking rows. There is deliberately no Active Skills metric or Skill icon.
 The reference image guides spacing and layout, not category count, names or palette.
-Charts use existing neon theme tokens. The activity axis uses integer ticks; its scale is
+Charts use shared fantasy theme tokens. The activity axis uses integer ticks; its scale is
 presentation only and does not change completion counts.
 
 Life Areas show a radar beside rows containing a color marker, full name, share bar,
@@ -880,7 +880,7 @@ uncategorized rewards, stacked proportions, recurring events, keyboard tooltips/
 
 ## Goals page visual hierarchy
 
-Columns keep their neon accent borders while inner lists have no extra frame and cards
+Columns keep their muted fantasy accent borders while inner lists have no extra frame and cards
 use subdued surfaces. Step/Quest/Arc share one layout with progressively larger padding
 and title sizes. XP sits below the title in smaller, muted text. Completed cards keep a
 readable title, state badge and usable controls but lose the bright outline/glow. Completed
@@ -985,8 +985,8 @@ completion/undo, browser permission outcomes and both desktop/mobile Goal pages.
 
 ### Weekly Activity completion types
 
-Weekly Activity stacks recorded completion events by Step (teal), Quest (purple) and
-Arc (orange), with a compact legend and daily mouse/keyboard tooltips. Escape dismisses
+Weekly Activity stacks recorded completion events by Step (muted teal), Quest (matte gold) and
+Arc (burgundy), with a compact legend and daily mouse/keyboard tooltips. Escape dismisses
 the tooltip. A neutral Unclassified segment preserves events without a valid historical
 type; their current Goal type is not evidence of the type at completion. New history
 records snapshot `goalType`; old records are preserved without guessing or backfilling.
@@ -994,3 +994,20 @@ Editing/deleting a Goal does not reclassify its recorded completions. Recurring 
 count separately, and undo removes the corresponding event. The weekly summary sums all
 recorded completions and awarded XP, including records referencing an absent Skill.
 Top Skill Progression remains limited to five earning Skills; Life Areas are unchanged.
+
+## UI typography and view continuity
+
+MedievalSharp remains on page/section headings and the profile name. UI text uses
+system fonts; Skill progress tracks leave room for their existing action column.
+The main navigation remains synchronous. A 220 ms CSS fade is applied to the incoming
+view after the existing visibility/render update; a new click clears any earlier fade.
+The body and header interpolate background colors over the same duration. No view
+snapshots, timers, data changes, or scroll changes are introduced. Reduced motion
+removes the fade and color transitions, including when enabled during a transition.
+Statistics keeps the original 1320 px maximum width and existing chart breakpoints.
+
+```sh
+STATISTICS_TEST_SCRIPT=ui-polish-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=ui-polish-browser.js python3 tests/statistics-browser.py webkit 390 844
+STATISTICS_TEST_SCRIPT=ui-polish-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
+```

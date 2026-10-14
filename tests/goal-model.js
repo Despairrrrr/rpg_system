@@ -300,28 +300,23 @@ assert(/@media \(max-width: 1180px\)[\s\S]*?\.goal-board \{[\s\S]*?repeat\(2,/.t
 assert(/@media \(max-width: 720px\)[\s\S]*?\.goal-board \{[\s\S]*?grid-template-columns: 1fr/.test(styles), '23: one column on a phone');
 
 const token = (name) => (styles.match(new RegExp('--' + name + ':\\s*([^;]+);')) || [])[1];
-assert(token('goal-step') === '#27d9d0', '24: Step is cyan/teal');
-assert(token('goal-quest') === '#7c6cff', '24: Quest is electric violet');
-assert(token('goal-arc') === 'var(--orange)', '24: Arc reuses the existing amber token');
+assert(token('goal-step') === 'var(--sage)', '24: Step uses muted sage');
+assert(token('goal-quest') === 'var(--gold)', '24: Quest uses matte gold');
+assert(token('goal-arc') === 'var(--burgundy)', '24: Arc uses the reference burgundy');
 for (const type of goalTypes) {
   assert(styles.includes(`.goal-column.${type} { color: var(--goal-${type}); }`), '24: the ' + type + ' column uses its accent');
   assert(styles.includes(`.goal-tree-item.${type} { color: var(--goal-${type}); }`), '24: the ' + type + ' tree item uses its accent');
-  assert(styles.includes(`--goal-${type}:`), '24: ' + type + ' has a token');
 }
-// 25: destructive red stays red, and is not what an Arc is drawn in.
-assert(token('red') === '#ff4f4f', 'destructive red still has its own token');
-assert(token('goal-arc') !== token('red'), '25: Arc is not red');
-assert(/--goal-arc: var\(--orange\)/.test(styles) && token('orange') === '#ffae16', '25: Arc is amber/gold, not red');
-assert(/\.goal-menu-item--danger \{[\s\S]*?255, 79, 79/.test(styles), '25: the Delete row is still red');
-assert(/\.mini-btn\.danger \{[\s\S]*?255, 79, 79/.test(styles), '25: the danger button is still red');
-assert(/#ff9898/.test(styles), '25: destructive text is still red-tinted');
-assert(token('goal-arc') !== '#ff4f4f' && token('goal-quest') !== '#ff4f4f' && token('goal-step') !== '#ff4f4f', '25: no goal type borrows the destructive red');
-assert(token('yellow') !== undefined, 'the warning yellow token is untouched, just unused by goal types');
+// Destructive actions retain a burgundy treatment in both themes.
+assert(token('red') === 'var(--danger-text)', '25: destructive feedback uses burgundy');
+assert(/\.goal-menu-item--danger \{[\s\S]*?color: var\(--danger-text\)/.test(styles), '25: Delete retains its destructive accent');
+assert(/\.mini-btn\.danger \{[\s\S]*?color: var\(--danger-text\)/.test(styles), '25: danger buttons retain their destructive accent');
+assert(token('yellow') === 'var(--accent-text)', 'warning text uses readable theme gold');
 // The recurrence badge is quiet, and never wears a type accent.
 const badge = section(styles, '.goal-repeat-badge {', '\n}');
 assert(/\.goal-repeat-badge\[hidden\]/.test(styles), 'the badge can be hidden');
 assert(!/var\(--goal-/.test(badge), 'the badge must not compete with the type accents');
 assert(/font-size: 10px/.test(badge) && /text-transform: uppercase/.test(badge), 'the badge is small and compact');
-assert(styles.includes('::placeholder') && /#6d8496/.test(styles), 'placeholders keep the muted styling');
+assert(/::placeholder\s*\{[\s\S]*?color: var\(--muted\)/.test(styles), 'placeholders keep the muted styling');
 
-(typeof print === 'function' ? print : console.log)('PASS: 3 roles + placeholders, recurrence rules, parent compatibility, migration (v1 data, cycles, idempotency), preserved XP/completion/streak paths, 3-column board, accent tokens, destructive red');
+(typeof print === 'function' ? print : console.log)('PASS: 3 roles + placeholders, recurrence rules, parent compatibility, migration (v1 data, cycles, idempotency), preserved XP/completion/streak paths, 3-column board, fantasy accent tokens, destructive burgundy');

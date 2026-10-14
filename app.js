@@ -4288,6 +4288,7 @@ document
     item.addEventListener(
       "click",
       () => {
+        const previousSection = document.querySelector('.nav-item.active')?.dataset.section;
         document
           .querySelectorAll(
             ".nav-item"
@@ -4310,6 +4311,17 @@ document
         document.getElementById('goalsPage').hidden = section !== 'goals';
         if (els.searchInput) els.searchInput.closest("label").hidden = section !== 'goals';
         render();
+
+        // Navigation stays synchronous. Cancel the previous visual fade before
+        // starting another, so rapid clicks cannot queue stale view changes.
+        document.querySelectorAll('.view-entering').forEach(node => node.classList.remove('view-entering'));
+        if (section !== previousSection && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          const incoming = section === 'statistics' ? statisticsPage
+            : previousSection === 'statistics' ? document.querySelector('.dashboard')
+            : document.getElementById(section === 'journey' ? 'journeyPage' : 'goalsPage');
+          void incoming.offsetWidth;
+          incoming.classList.add('view-entering');
+        }
 
         if (
           section === "goals"
