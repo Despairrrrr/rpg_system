@@ -1,11 +1,12 @@
-function createJourneyForecastView({ getState, getPlan, update, now = () => new Date() }) {
+function createJourneyForecastView({ getState, getPlan, update, updatePreferences, now = () => new Date() }) {
   const panel = document.getElementById('journeyForecast');
   if (!panel) return null;
   const $ = id => document.getElementById(id);
   const input = $('forecastEndTime');
   const error = $('forecastError');
-  let previousSettings = '';
-  let previousDay = '';
+  let previousTime = '';
+  let previousActivation = null;
+  let previousExpanded = null;
   const labels = { good: 'Good outlook', 'at-risk': 'At risk', 'high-risk': 'High risk' };
   function text(id, value) {
     const node = $(id);
@@ -13,61 +14,81 @@ function createJourneyForecastView({ getState, getPlan, update, now = () => new 
   }
   function render() {
     const current = now();
-    const result = JourneyForecast.calculate(getState().journeyForecast, getPlan(current), current);
-    const { settings, phase } = result;
-    const today = Statistics.dayKey(current);
-    // A fresh day exposes Calculate, even if yesterday's panel was collapsed.
-    if (previousDay && previousDay !== today && phase === 'inactive') panel.open = true;
-    previousDay = today;
-    const signature = JSON.stringify(settings);
-    // Clock/Goal updates must not overwrite a partially edited native time input.
-    if (signature !== previousSettings) {
+    const plan = getPlan(current);
+    const result = JourneyForecast.calculate(getState().journeyForecast, plan, current);
+    const { settings } = result;
+    // Empty Focus is distinct from completed Focus, regardless of target activation.
+    const phase = plan.length ? result.phase : 'empty';
+    const risk = phase === 'expired' ? 'high-risk' : result.risk;
+    // Minute ticks and disclosure/visibility saves never overwrite an input draft.
+    if (settings.preferredEndTime !== previousTime || settings.activeDate !== previousActivation) {
       input.value = settings.preferredEndTime;
+      previousTime = settings.preferredEndTime;
+      previousActivation = settings.activeDate;
       error.textContent = '';
-      previousSettings = signature;
     }
+    if (settings.expanded !== previousExpanded) {
+      previousExpanded = settings.expanded;
+      panel.open = settings.expanded;
+    }
+    $('forecastUseToday').checked = Boolean(settings.activeDate);
+    $('forecastShowIndicator').checked = settings.showIndicator;
     panel.dataset.phase = phase;
-    panel.dataset.risk = result.risk;
-    text('forecastPercent', phase === 'active' ? `${Math.round(result.percent)}%` : '');
-    $('forecastPercent').hidden = phase !== 'active';
-    text('forecastStatus', phase === 'active' ? labels[result.risk] : {
-      inactive: 'Choose a target', completed: 'No remaining goals', expired: "Time’s up", unavailable: 'Check goal XP',
+    panel.dataset.risk = risk;
+    $('forecastIndicator').hidden = !settings.showIndicator || !risk;
+    const status = phase === 'active' ? labels[risk] : {
+      empty: 'No Focus goals', inactive: 'Choose a target for today', completed: 'Focus complete',
+      expired: 'Time’s up', unavailable: 'Forecast unavailable',
+    }[phase];
+    text('forecastStatus', status);
+    text('forecastTarget', settings.activeDate ? settings.preferredEndTime : 'Set target');
+    $('forecastTarget').title = settings.activeDate ? `Today's target: ${settings.preferredEndTime}` : `Remembered time: ${settings.preferredEndTime} · Not active today`;
+    text('forecastDetails', phase === 'active' ? `${status} — for your remaining Focus goals.` : {
+      empty: 'Choose goals for Today’s Focus to see an outlook.',
+      inactive: 'Change the time or use your remembered target today to see a Focus outlook.',
+      completed: 'Your Focus work is complete. Undo or add a Focus goal to update the outlook.',
+      expired: 'The target time has passed. Choose a later time to update your Focus outlook.',
+      unavailable: 'Check the XP of your remaining Focus goals to restore the outlook.',
     }[phase]);
-    text('forecastTarget', settings.activeDate ? `Target: ${settings.preferredEndTime}` : 'Finish today at your own pace');
-    text('forecastPrompt', phase === 'expired' ? 'Choose a later time and calculate again.' : "When do you want to finish today's goals?");
-    text('forecastDetails', phase === 'active'
-      ? `About ${result.workloadMinutes} min of goals · ${Math.floor(result.availableMinutes)} min of usable time.`
-      : phase === 'completed' ? 'Nothing left to estimate. The forecast will update if your plan changes.'
-        : phase === 'unavailable' ? 'Some remaining goals have invalid XP. Edit them to calculate an estimate.'
-          : phase === 'expired' ? 'The deadline has passed. Your XP and completed goals are unchanged.'
-            : 'Start a fresh forecast for today. Your last selected time is remembered.');
-    $('forecastCalculate').hidden = Boolean(settings.activeDate) && phase !== 'expired';
-    text('forecastCalculate', phase === 'expired' ? 'Restart forecast' : 'Calculate');
-    text('forecastEdit', phase === 'expired' ? 'Set a new time' : 'Edit target');
-    $('forecastEdit').hidden = !settings.activeDate;
-    return result;
+    return { ...result, phase, risk };
   }
   function apply(activate) {
     const time = input.value;
-    if (!GoalSchedule.validTime(time)) { error.textContent = 'Choose a valid time.'; return; }
-    const current = now();
-    if (activate && JourneyForecast.deadline(time, current) <= current.getTime()) {
+    if (!GoalSchedule.validTime(time)) {
+      error.textContent = 'Choose a valid time.';
+      $('forecastUseToday').checked = Boolean(JourneyForecast.normalize(getState().journeyForecast).activeDate);
+      return;
+    }
+    if (activate && JourneyForecast.deadline(time, now()) <= now().getTime()) {
       error.textContent = 'Choose a time later today.';
+      $('forecastUseToday').checked = Boolean(JourneyForecast.normalize(getState().journeyForecast).activeDate);
       return;
     }
     if (!update(time, activate)) {
-      error.textContent = 'Could not save the forecast. Please try again.';
+      render();
+      error.textContent = 'Could not save the target. Please try again.';
       return;
     }
     error.textContent = '';
     render();
-    if (activate) {
-      panel.open = false;
-      $('forecastSummary').focus();
-    }
   }
-  input.addEventListener('change', () => apply(false));
+  input.addEventListener('change', () => apply(true));
+  $('forecastUseToday').addEventListener('change', event => apply(event.target.checked));
   $('forecastForm').addEventListener('submit', event => { event.preventDefault(); apply(true); });
-  $('forecastEdit').addEventListener('click', () => { panel.open = true; input.focus(); });
+  $('forecastShowIndicator').addEventListener('change', event => {
+    const saved = updatePreferences({ showIndicator: event.target.checked });
+    render();
+    if (!saved) error.textContent = 'Could not save the indicator preference. Please try again.';
+  });
+  panel.addEventListener('toggle', () => {
+    const settings = JourneyForecast.normalize(getState().journeyForecast);
+    if (panel.open === settings.expanded) return;
+    if (!updatePreferences({ expanded: panel.open })) {
+      panel.open = settings.expanded;
+      error.textContent = 'Could not save the panel preference. Please try again.';
+      return;
+    }
+    render();
+  });
   return { render };
 }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Goal Tracker</title>
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=24" />
+  <link rel="stylesheet" href="styles.css?v=25" />
 </head>
 <body>
   <header class="topbar">
@@ -41,22 +41,10 @@
       <div class="section-head"><h1 id="journeyHeading">Today's Journey</h1><button type="button" class="primary-btn" id="addJourneyGoal">+ Add a Goal</button></div>
       <p id="journeyDate" class="field-hint"></p>
       <p id="journeySummary" role="status"></p>
-      <progress id="journeyProgress" max="1" value="0" aria-label="Today's goal completion"></progress>
-      <section class="forecast-panel" aria-label="Journey Forecast">
-        <details id="journeyForecast" open>
-          <summary id="forecastSummary"><span class="forecast-title">Journey Forecast</span><span class="forecast-result" role="status" aria-atomic="true"><strong id="forecastPercent" hidden></strong><span id="forecastStatus">Choose a target</span></span></summary>
-          <div class="forecast-content">
-            <form id="forecastForm">
-              <label for="forecastEndTime" id="forecastPrompt">When do you want to finish today's goals?</label>
-              <div class="forecast-controls"><input type="time" id="forecastEndTime" value="21:00" required aria-describedby="forecastHint forecastError" /><button type="submit" class="secondary-btn" id="forecastCalculate">Calculate</button></div>
-              <p id="forecastError" class="form-error" role="alert"></p>
-            </form>
-            <p id="forecastDetails" class="field-hint"></p>
-            <p id="forecastHint" class="field-hint">A rough planning estimate, not a measured probability. Goal XP selects approximate durations; 25% of remaining time is reserved for interruptions.</p>
-          </div>
-        </details>
-        <div class="forecast-footer"><span id="forecastTarget">Finish today at your own pace</span><button type="button" id="forecastEdit" hidden>Edit target</button></div>
-      </section>
+      <div class="journey-progress-track">
+        <progress id="journeyProgress" max="1" value="0" aria-label="Today's goal completion"></progress>
+        <span id="journeyProgressFill" aria-hidden="true"></span>
+      </div>
       <div class="journey-toolbar">
         <div class="journey-segments journey-sort" id="journeySort" role="group" aria-label="Task order">
           <button type="button" data-journey-sort="time" aria-pressed="true">By time</button>
@@ -65,6 +53,22 @@
       </div>
       <p id="journeyOrderHint" class="field-hint" hidden>Use the arrows to arrange tasks within each section. Scheduled times stay the same.</p>
       <p id="journeyOrderStatus" class="journey-sr-only" role="status"></p>
+      <section class="forecast-panel" aria-label="Journey Forecast">
+        <details id="journeyForecast">
+          <summary id="forecastSummary"><span class="forecast-title">Journey Forecast</span><span class="forecast-result" role="status" aria-atomic="true"><span id="forecastIndicator" aria-hidden="true" hidden></span><span id="forecastStatus" class="journey-sr-only">Choose a target for today</span><span id="forecastTarget">Set target</span></span></summary>
+          <div class="forecast-content">
+            <form id="forecastForm">
+              <div class="forecast-controls">
+                <label for="forecastEndTime" id="forecastPrompt">Finish today's Focus by</label>
+                <input type="time" id="forecastEndTime" value="21:00" required aria-describedby="forecastDetails forecastError" />
+                <label class="forecast-option"><input type="checkbox" id="forecastUseToday" />Use this target today</label>
+              </div>
+              <p id="forecastError" class="form-error" role="alert"></p>
+            </form>
+            <div class="forecast-description"><p id="forecastDetails" class="field-hint"></p><label class="forecast-option"><input type="checkbox" id="forecastShowIndicator" checked />Show status indicator</label></div>
+          </div>
+        </details>
+      </section>
       <div id="journeyList"></div>
     </section>
     <section class="main-column" id="goalsPage" hidden>
@@ -440,9 +444,9 @@
   <script src="statistics-model.js?v=2"></script>
   <script src="statistics.js?v=6"></script>
   <script src="schedule-model.js?v=4"></script>
-  <script src="journey-forecast-model.js?v=1"></script>
-  <script src="journey-forecast.js?v=1"></script>
+  <script src="journey-forecast-model.js?v=2"></script>
+  <script src="journey-forecast.js?v=2"></script>
   <script src="reminders.js?v=2"></script>
-  <script src="app.js?v=24"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>

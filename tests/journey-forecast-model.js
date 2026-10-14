@@ -17,7 +17,7 @@ assert(JourneyForecast.duration({type:'arc',xp:5000})===0,'Arc duration excluded
 for (const xp of [undefined,null,-1,1.5,Infinity,'','bad']) assert(JourneyForecast.duration({type:'step',xp})===null,'invalid XP cannot invent a duration');
 const now = new Date(2026,9,12,15), today = Statistics.dayKey(now);
 const make = (id,type='step',extra={}) => ({id,type,title:'Identical title',xp:type==='quest'?200:10,...extra});
-const work = (goals, selectedIds=[],hiddenIds=[]) => JourneyForecast.workload(api.journeyForecastGoals(goals,{date:today,selectedIds,hiddenIds},now));
+const work = (goals, selectedIds=[],hiddenIds=[],focusIds=selectedIds) => JourneyForecast.workload(api.journeyForecastGoals(goals,{date:today,selectedIds,hiddenIds,focusIds},now));
 assert(work([make('s')],['s']).minutes===5,'independent Step');
 assert(work([make('q','quest')],['q']).minutes===105,'independent Quest');
 const nested=[make('q','quest'),make('s','step',{parentGoalId:'q'}),make('c','step',{parentGoalId:'q',completed:true})];
@@ -29,9 +29,9 @@ assert(work(nested,['q'],['s']).minutes===0,'hidden child of completed Quest exc
 const arc=[make('arc','arc'),make('s','step',{parentGoalId:'arc'}),make('q','quest',{parentGoalId:'arc'})];
 assert(work(arc,['arc','s','q']).minutes===110,'direct Step and Quest under Arc count, Arc never does');
 const membership=[make('daily','step',{schedule:{type:'daily'}}),make('off','quest',{schedule:{type:'weekly',daysOfWeek:[2]}}),make('paused','step',{status:'paused',schedule:{type:'daily'}}),make('done','step',{completed:true}),make('outside'),make('hidden','step',{schedule:{type:'daily'}})];
-assert(work(membership,['paused','done'],['hidden']).minutes===10,'automatic daily and manually selected pause included; offday/hidden/completed/outside excluded');
+assert(work(membership,['paused','done'],['hidden']).minutes===5,'only explicitly focused manual pause included; automatic Other, offday, hidden, completed and outside excluded');
 assert(work([make('one'),make('two')],['one','two']).minutes===10,'same titles are separate IDs');
-const selected={date:today,selectedIds:['one'],hiddenIds:[]};
+const selected={date:today,selectedIds:['one'],focusIds:['one'],hiddenIds:[]};
 const plan=[make('one'),make('two','step',{schedule:{type:'daily'}})];
 const baseline=JourneyForecast.workload(api.journeyForecastGoals(plan,selected,now)).minutes;
 assert(JourneyForecast.workload(api.journeyForecastGoals(plan,{...selected,viewMode:'split',focusIds:['one'],collapsedSections:{focus:true,other:true,completed:true},sortMode:'manual',orderIds:['two','one']},now)).minutes===baseline,'presentation/reordering do not change membership');
@@ -66,3 +66,23 @@ const frozen=JSON.stringify([active,three]);JourneyForecast.calculate(active,thr
 const dst=new Date(2026,2,8,0,30);
 assert(JourneyForecast.deadline('04:00',dst)===new Date(2026,2,8,4).getTime(),'deadline follows local Date/DST semantics');
 (typeof print==='function'?print:console.log)('PASS: duration rules/ties, Journey eligibility/nesting, formula/risk, time/completion/undo, expiry, reload, rollover, invalid data and migration');
+
+assert(work(membership,[],[],[]).minutes===0,'automatic habits never become forecast Focus');
+assert(work(membership,[],[],['daily']).minutes===5,'explicitly focused scheduled habit contributes');
+assert(work([make('manual')],['manual'],[],[]).minutes===0,'manually selected Other Task excluded');
+assert(work([make('outside')],[],[],['outside']).minutes===0,'Focus IDs alone never add absent goals to plan');
+const hierarchy=[make('q','quest'),make('s','step',{parentGoalId:'q'})];
+assert(work(hierarchy,['q','s'],[],['s']).minutes===0,'dormant child Focus never prioritizes its visible Other Quest');
+assert(work(hierarchy,['s'],[],['s']).minutes===5,'independent focused child contributes without visible parent');
+assert(work(hierarchy,['q'],[],['q']).minutes===105,'focused Quest includes children without double workload');
+hierarchy[0].completed=true;
+assert(work(hierarchy,['q'],[],['q']).minutes===5,'unfinished nested child remains work after focused parent completion');
+const prefs=JourneyForecast.normalize({...active,showIndicator:false,expanded:true},today);
+assert(!prefs.showIndicator && prefs.expanded,'visibility and disclosure preferences normalized');
+const rolled=JourneyForecast.normalize(prefs,'2026-10-13');
+assert(!rolled.activeDate && rolled.preferredEndTime==='16:00' && !rolled.showIndicator && rolled.expanded,'day reset preserves remembered time and UI preferences only');
+const defaults=JourneyForecast.normalize(null,today);
+assert(defaults.showIndicator && !defaults.expanded && !defaults.activeDate,'safe defaults: shown indicator, collapsed, inactive');
+assert(JourneyForecast.normalize({expanded:'yes',showIndicator:'no'},today).showIndicator && !JourneyForecast.normalize({expanded:'yes'},today).expanded,'malformed UI preferences use boolean defaults');
+assert(!api.journeyForecastGoals(plan,{...selected,date:'2026-10-11'},now).length,'daily reset clears Focus workload without inferring new priority');
+(typeof print==='function'?print:console.log)('PASS: Focus-only workload, hierarchy, explicit daily activation and persistent UI preferences');

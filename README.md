@@ -91,7 +91,7 @@ Daily `focusIds`, selection, hiding and order use the existing local state and F
 normalization validates IDs and clears them on the next local day. Sort preference persists.
 Section expansion is session-only and survives view switches and ordinary rerenders without
 storage/cloud writes. A page reload starts with Focus/Other expanded and Completed collapsed.
-Forecast continues to count all remaining planned work, regardless of Focus or collapse.
+Forecast now counts only explicitly focused groups and their remaining work, regardless of collapse.
 All views share existing Goals, XP and history; no separate rewards or completion records.
 
 Pause a Step, Quest or Arc through its **…** menu to stop automatic Today inclusion
@@ -102,25 +102,27 @@ for Today and completed normally. The × remains a separate removal for today on
 
 ## Journey Forecast
 
-Below Today's progress, choose when you want to finish and press **Calculate**. The collapsible
-panel keeps an approximate percentage, risk label and target visible. **Edit target** applies a
-change immediately while active. Your preferred time is remembered across days, but each new
-local day requires a fresh activation. An expired target shows **Time’s up**: choose a later time
-and restart. Completing all applicable goals hides the percentage; adding work makes it available again.
+The compact Forecast sits below sorting, immediately above Today's Focus. Its collapsed row
+shows a status circle and today's active target time; the percentage stays internal. Expand it
+to edit the time or hide/show the indicator. Both disclosure and visibility preferences persist.
+New users start with the panel collapsed.
 
-This is a planning heuristic, not a statistically validated probability. It uses 75% of the remaining
-clock time and `P = 100 × T² / (T² + W²)`, where T is usable minutes and W is remaining estimated work.
-Steps take 5 minutes at 10 XP, 15 at 125 XP, otherwise 10. Quests use 105/180/210 minutes for
-200/350/500 XP; custom XP uses the nearest preset, with ties toward the lower XP.
-Unfinished included Quests cover their child Steps without partial reduction. Other included Steps
-count independently; Arcs, completed goals and goals hidden from Today contribute no workload.
-A remaining included Step counts separately when its Quest is absent or completed.
+Changing the time activates a valid future target for today and updates the outlook automatically.
+**Use this target today** reuses a remembered time without editing. A new day clears activation,
+retaining your preferred time and UI settings. Expired targets never extend automatically; choose
+a later time to restart. The panel never opens automatically when status or date changes.
 
-Green **Good outlook** (75–100%), yellow **At risk** (40–74%) and red **High risk** (0–39%)
-follow the displayed rounded percentage. Updates share the existing minute and tab-resume lifecycle,
-without minute-by-minute state writes. Goal changes recalculate immediately; view/order switches do
-not affect work. Settings use the existing localStorage/Firebase mirror. Forecasting changes no XP,
-completion history or goal schedules. See [implementation details](CRUD.md#journey-forecast).
+Only Focus root groups contribute: unfinished Quests cover their Steps; remaining children of a
+completed focused Quest count separately. Other Tasks do not affect the outlook. No Focus or no
+active target shows no coloured indicator; completed work is explained as **Focus complete**.
+The original duration estimates, 75% usable-time factor and risk thresholds are preserved.
+Green means Good outlook, yellow At risk, red High risk; expiry is explained as Time’s up.
+
+Updates reuse the existing minute/resume lifecycle and happen after Focus changes, completion,
+undo, time edits and relevant Goal changes. Calculation never writes state or changes XP/history.
+The 8px daily progress bar still counts the whole daily plan: 65% width (max 700px) on desktop,
+full width on mobile, antique-gold fill and a 300ms transition disabled under reduced motion.
+Dates and counts use the existing editorial font family. See [implementation details](CRUD.md#journey-forecast).
 
 ## Run
 

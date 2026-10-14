@@ -9,6 +9,8 @@ const JourneyForecast = (() => {
     return {
       preferredEndTime: valid ? value.preferredEndTime : DEFAULT_END_TIME,
       activeDate: valid && value?.activeDate === today ? today : '',
+      showIndicator: value?.showIndicator !== false,
+      expanded: value?.expanded === true,
     };
   }
   function duration(goal) {
@@ -54,7 +56,7 @@ const JourneyForecast = (() => {
     if (due === null || work.minutes === null) return { ...base, phase: 'unavailable' };
     if (due <= now.getTime()) return { ...base, phase: 'expired' };
     const percent = percentage(availableMinutes, work.minutes);
-    // Labels follow the displayed integer, so a visible 75% always means Good outlook.
+    // Preserve the original rounded-percentage thresholds; percentage stays internal.
     const display = Math.round(percent);
     return { ...base, phase: 'active', percent,
       risk: display >= 75 ? 'good' : display >= 40 ? 'at-risk' : 'high-risk' };

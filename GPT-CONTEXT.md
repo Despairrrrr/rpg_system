@@ -1,7 +1,7 @@
 # Goal Tracker — полный контекст для передачи другой модели (GPT)
 
 Всё ниже написано **по коду** (app.js, страницы, модули, стили, тесты), а не по AGENTS.md/README.md.
-Контекст сверен с реализацией на 14 октября 2026: Focus / Other Tasks / Completed, компактный fantasy journal, Journey Forecast и скрытые завершения в сводке Today.
+Контекст сверен с реализацией на 15 октября 2026: Focus / Other Tasks / Completed, компактный fantasy journal, Journey Forecast и скрытые завершения в сводке Today.
 Life History / Chronicles были отменены: их раздела, модулей и полей в текущей реализации нет.
 Скопируй этот файл целиком в модель как контекст перед задачей.
 
@@ -29,11 +29,11 @@ firebase.init.js?v=2            — инициализирует app тольк�
 statistics-model.js?v=2          — глобальный Statistics
 statistics.js?v=6                — createStatisticsView({getState, save}); null без #statisticsPage (поэтому безопасен на skill.html)
 schedule-model.js?v=4            — глобальный GoalSchedule
-journey-forecast-model.js?v=1    — глобальный JourneyForecast: чистые расчёты и нормализация
-journey-forecast.js?v=1          — createJourneyForecastView; null без #journeyForecast
+journey-forecast-model.js?v=2    — глобальный JourneyForecast: чистые расчёты и нормализация
+journey-forecast.js?v=2          — createJourneyForecastView; null без #journeyForecast
 reminders.js?v=2                 — createReminderPanel, createReminderSystem, createBrowserReminders
-app.js?v=24                      — всё приложение
-styles.css?v=24                  — на всех трёх страницах
+app.js?v=25                      — всё приложение
+styles.css?v=25                  — на всех трёх страницах
 ```
 
 `login.html` грузит только firebase-app + firebase-auth + firebase.init + `login.js?v=2` (без Firestore).
@@ -105,7 +105,7 @@ state = {
   schemaVersion: 3,                  // добавляется миграцией
   journey: { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [], orderIds: [], focusIds: [],
              viewMode: "all"|"split", sortMode: "time"|"manual" },
-  journeyForecast: { preferredEndTime: "21:00", activeDate: "" }, // activeDate = текущий локальный день после Calculate
+  journeyForecast: { preferredEndTime: "21:00", activeDate: "", showIndicator: true, expanded: false }, // явная активация на текущий день
   oneTimeSchedules?: { [goalId]: { day: "YYYY-MM-DD", configuredAt: ms } },
   reminderReceipts?: { [goalId]: { key, status: "done"|"skipped" } },
 }
@@ -276,65 +276,58 @@ state = {
 
 ## Journey Forecast
 
-Компактная панель находится под прогрессом Today, перед By time / My order. Focus и раскрытие секций
-не меняют Forecast: учитываются все оставшиеся цели плана, включая Other Tasks.
-Это приблизительная игровая оценка реалистичности плана, а не статистически проверенная вероятность.
-Нативное поле времени изначально показывает 21:00. Изменение поля запоминает предпочтение;
-Calculate активирует прогноз только для времени позже текущего и сворачивает панель.
-В свёрнутом виде остаются процент, текст риска и выбранный срок; Edit target раскрывает поле.
-Редактирование ещё активного срока сразу пересчитывает прогноз без второго Calculate.
-После истечения срока показано Time’s up; Set a new time позволяет выбрать более позднее время
-и явно запустить новый прогноз. Срок сам не продлевается, XP/history/выбор Today не меняются.
+Порядок шапки: заголовок → дата → счётчик → прогресс → By time / My order → Forecast → Focus.
+Дата (14px) и счётчик (15px, tabular numerals) используют Georgia/serif; главный заголовок не менялся.
+Прогресс 8px, desktop 65% ширины/max 700px, mobile ≤720px — 100%; трек #D8C5A0,
+градиент #8C6425 → #B8842F → #D6A85A. Native `#journeyProgress` сохраняет доступность/value/max,
+а постоянный `#journeyProgressFill` плавно меняет width за 300ms только при изменении значения.
+Первый показ/reload не анимируется; reduced motion отключает переход. Счётчик по-прежнему считает весь Today.
 
-Минимальный стейт: `journeyForecast: { preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | "" }`.
-Отдельные проценты, статус и deadline timestamp не хранятся. `JourneyForecast.normalize()` добавляет
-безопасные значения старым документам; невалидное время становится 21:00 с пустой activeDate.
-Активация сохраняется только для текущего локального дня. В новый день preferredEndTime остаётся,
-а activeDate очищается существующим maintenance-путём; панель раскрывается для запуска одним Calculate, без повышения updatedAt. Повторная миграция
-идемпотентна. Настройки проходят обычные localStorage/Firestore записи, storage-синхронизацию и rollback
-при ошибке записи. Перезагрузка в тот же день восстанавливает прогноз либо вычисляемое истечение.
+Forecast — нативный details со свёрнутой высотой 48px, отступом до списка 12px, без sticky.
+В summary — шеврон, название, необязательный цветной круг 14px и активное время. Процент,
+Calculate, Edit target и формула убраны из UI. Внутри — время, Use this target today, короткий
+статус и Show status indicator. Новые пользователи получают свёрнутую панель.
 
-`journeyForecastGoals()` переиспользует `journeyGoals()` и `journeyChildren()`: действующий план Today,
-включая детей свёрнутых Quests, автоматические повторения на сегодня и ручной выбор (в том числе paused).
-Удалённые через × и отсутствующие в плане цели исключены. Это не `journeySummary()`: скрытые выполненные
-цели могут сохраняться в счётчике Today, но не добавляют работу. View/sort/order не влияют на результат.
-Дедупликация идёт по ID. Completed и сами Arcs исключены; их подходящие Step/Quest-потомки учитываются.
-Незавершённый включённый Quest покрывает свои Steps целиком: выполнение ребёнка не уменьшает оценку Quest.
-Если Quest отсутствует в прогнозе (в том числе уже выполнен), оставшийся включённый Step считается отдельно.
+`journeyForecast: { preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | "",
+showIndicator: true, expanded: false }`. `JourneyForecast.normalize()` idempotent; неизвестное
+время → 21:00/inactive, некорректные UI-флаги → defaults. На новый день activeDate очищается,
+но время и UI-предпочтения сохраняются. Обычные localStorage/Firestore write, storage-sync и rollback;
+нового документа нет. В отличие от task sections, раскрытие Forecast сохраняется после reload.
+Статус/смена дня никогда не раскрывают панель. События toggle при восстановлении настроек не пишут снова.
 
-Точные оценки в минутах:
+Изменение валидного будущего времени явно активирует цель на сегодня, без Calculate.
+Use this target today повторно использует прежнее время без редактирования; снятие выключает цель.
+Прошедшее/невалидное время не заменяет сохранённое. Дата, Focus и новые Goals не активируют вчерашний
+target автоматически. После expiry пользователь явно выбирает более позднее время; продления нет.
 
-- Step: 10 XP → 5; 125 XP → 15; любое другое допустимое XP → 10.
-- Quest: 200 XP → 105; 350 XP → 180; 500 XP → 210. Кастомное XP выбирает ближайший пресет;
-  при равном расстоянии меньший XP (275 → 105 минут; 425 → 180 минут).
-- Допустимо конечное неотрицательное целое XP, включая числовую строку. Невалидное XP оставшейся
-  учитываемой цели даёт состояние unavailable / Check goal XP вместо NaN или ложного «всё готово».
+`journeyForecastGoals()` берёт существующие `journeyGoals()`, фильтрует roots по дневным `focusIds`,
+затем добавляет `journeyChildren()`. Other Tasks и hidden/absent roots исключены. Focus вложенного
+Step под unfocused Quest остаётся dormant и не попадает в прогноз. Завершённые roots остаются во входном
+плане для отличия пустого Focus от завершённой работы; workload исключает completed/Arc и дубли по ID.
+Незавершённый Quest покрывает Steps без частичного уменьшения. Незавершённые дети завершённого focused
+Quest учитываются отдельно; самостоятельно видимый focused Step считается сам. Collapse/sort не влияют.
 
-`AVAILABLE_TIME_FACTOR = 0.75` задан один раз в `journey-forecast-model.js`.
-`T = max(0, минуты до выбранного локального времени) × 0.75`, `W = сумма оценок оставшейся работы`.
-`P = 100 × T² / (T² + W²)` вычисляется эквивалентно через отношение W/T, без преждевременного округления.
-Только отображение округляется до целого; шкала ограничена 0–100. Цвет и подпись соответствуют
-отображённому числу: 75–100 Good outlook (зелёный), 40–74 At risk (жёлтый), 0–39 High risk (красный).
-Дата/время используют нативный локальный Date, включая его DST-семантику; переход на завтра не подразумевается.
+Формула и длительности сохранены: Step XP 10/125/другое валидное → 5/15/10 минут;
+Quest XP 200/350/500 → 105/180/210, custom — ближайший пресет, равное расстояние → меньший XP.
+`AVAILABLE_TIME_FACTOR = 0.75`; T — оставшиеся минуты × factor; W — оценка работы;
+`P = 100*T²/(T²+W²)`. Rounded internal P: 75+ Good outlook (#518763), 40–74 At risk (#CE9C39),
+ниже40 High risk (#A54C4C). P никогда не выводится в DOM. Это эвристика, а не проверенная вероятность.
+Невалидное XP → unavailable; дни/сроки — локальный Date с прежней DST-семантикой.
 
-`JourneyForecast.calculate()` возвращает inactive, active, completed, expired или unavailable.
-Без активации процент скрыт; при нулевой работе — completed / No remaining goals с тем же скрытым процентом.
-Панель остаётся доступной, а добавление работы или undo снова вычисляет прогноз по сохранённому сроку.
-Expired выводится при оставшейся работе и достигнутом deadline, без штрафа или повторных записей.
+Pure calculate возвращает inactive/active/completed/expired/unavailable, UI отдельно распознаёт
+empty plan как No Focus goals. Empty/inactive/unavailable/completed не показывают круг;
+completed поясняется Focus complete, expired — красный Time’s up. Hide indicator не отключает расчёт.
+Текст доступен в раскрытой панели и screen-reader status, цвет не является единственным объяснением.
 
-`createJourneyForecastView()` обновляет только собственные текст/атрибуты, сохраняя DOM, фокус,
-раскрытие и черновик времени. На skill.html возвращает null. `updateJourneyForecast()` в app.js
-синхронизирует состояние перед изменением настройки, сохраняет обычным путём и откатывает ошибку.
-Обновления используют существующий `createReminderSystem`: раз в 60 секунд, после render/CRUD,
-focus, pageshow, visibilitychange и storage; учитывают реальный Date.now после возвращения во вкладку.
-Новых интервалов нет; пересчёт процента не сохраняет состояние и не перерисовывает весь Journey.
-Шеврон использует токен анимации; reduced motion отключает переход. Цвет дополняется текстом.
+`updateJourneyForecast()` и `updateJourneyForecastPreferences()` сохраняют настройки обычным путём
+с rollback. `createJourneyForecastView()` сохраняет DOM, фокус и черновик времени; на skill.html null.
+Используется существующий reminder lifecycle: раз в 60s, после render/CRUD/Focus и при resume/storage.
+Новых интервалов и записей от пересчёта нет. History, XP, расписания, секции и Statistics не меняются.
 
-`tests/journey-forecast-model.js` проверяет оценки, членство/вложенность, формулу, сроки, миграцию,
-чистоту расчётов и локальные даты/DST. `tests/journey-forecast-browser.js` проверяет UI, lifecycle,
-completion/undo, смену дня, сохранение/ошибки, синхронизацию вкладок, мобильный экран и reduced motion,
-стабильность DOM/фокуса и единственный интервал. `tests/statistics-sync.js` проверяет перенос настроек
-через существующее облачное зеркало. Команды приведены в §2 и CRUD → Verification.
+Модельные тесты проверяют прежнюю математику, Focus-eligibility, hierarchy, миграцию/даты/DST;
+браузерный тест — состояния, прогресс 0/partial/100, цвета, activation, ошибки сохранения,
+реальный reload, синхронизацию, midnight/resume, desktop/mobile/reduced motion и единственный timer.
+`tests/statistics-sync.js` проверяет round-trip обоих UI-флагов вместе с настройками в mock Firestore.
 
 ## 9. Технические ограничения для модели
 
@@ -382,7 +375,7 @@ DATA MODEL:
 - profile: {name, photo (centre-cropped 256×256 JPEG data URL ≤150 KB, read only via
   readProfilePhoto(), never injected via innerHTML)}
 - journey: {date, selectedIds, hiddenIds, orderIds, focusIds, viewMode: all|split, sortMode: time|manual}
-- journeyForecast: {preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | ""}; no stored percentage/status
+- journeyForecast: {preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | "", showIndicator: boolean, expanded: boolean}; no stored percentage/status
 - optional: oneTimeSchedules {goalId:{day, configuredAt}}, reminderReceipts {goalId:{key,status}}
 - player XP = sum of skill XP (derived, never stored); level = floor(sqrt(xp/100))+1,
   threshold (L-1)²·100, span (2L-1)·100.
@@ -453,20 +446,20 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
 14. Life History/Chronicles is not part of this checked-out implementation. Its modules and
     chronicle snapshots are absent; adding them would be a separate product change.
 
-15. Journey Forecast stays below Today's progress and above the sort controls. All remaining planned work, including Other Tasks, counts regardless of collapse or Focus. Preserve native time,
-    disclosure/keyboard focus, collapsed percentage and risk label, immediate active target edits,
-    explicit activation each local day and explicit restart after expiry. Keep preferredEndTime
-    across days; derive expiry/completed state without minute writes. Never extend deadlines or
-    change XP/history. Empty work hides the percentage; new work can restore it.
-    Use journeyForecastGoals() with existing Journey roots/children, not journeySummary() or DOM.
-    Exclude hidden/completed/Arc goals, deduplicate by ID; unfinished included Quests cover Steps
-    without partial reduction. A remaining included Step counts if its Quest is absent/completed.
-    Step XP 10/125/other valid → 5/15/10 minutes; Quest XP 200/350/500 → 105/180/210,
-    custom nearest preset with ties toward lower XP. T = remaining minutes × AVAILABLE_TIME_FACTOR
-    (0.75); P = 100*T²/(T²+W²). This is a heuristic, not a calibrated probability. Display-rounded
-    75+/40+/below40 maps to Good outlook/At risk/High risk. Invalid XP fails gracefully.
-    Reuse the reminder lifecycle's single minute timer/resume hooks. Forecast UI updates only
-    its own stable DOM. Normalization is idempotent; settings use existing sync and rollback.
+15. Journey Forecast sits after sorting, immediately above Focus. Collapsed height 48px;
+    only title, optional 14px status circle and active target time. No percentage or Calculate.
+    A valid future time edit explicitly activates today; Use this target today reuses remembered
+    time. Day rollover clears activation only, preserving time and expanded/showIndicator settings.
+    No silent activation or deadline extension. Disclosure defaults closed and never auto-opens.
+    Use focused eligible roots plus their nested children; Other Tasks never contribute.
+    Preserve hierarchy estimates and formula: Step 10/125/other XP → 5/15/10 minutes;
+    Quest 200/350/500 → 105/180/210, nearest preset with ties lower. T = usable minutes × .75;
+    P = 100*T²/(T²+W²). Rounded internal 75+/40+/below40 retains original risks; no visible P.
+    Empty Focus, inactive, unavailable and completed work have no circle; expiry is red.
+    Reuse the single reminder timer/resume hooks and stable DOM, preserving drafts and focus.
+    Settings use normal save/sync/rollback; calculation never writes. Keep XP/history untouched.
+    Daily progress still counts all planned roots: 8px, 65%/max700px desktop, 100% mobile,
+    saturated gold, 300ms changes only, reduced motion respected; editorial date/counter.
 
 CONSTRAINTS:
 - Vanilla JS only. Globals and load order matter: firebase compat → firebase.init →

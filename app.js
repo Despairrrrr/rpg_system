@@ -382,10 +382,11 @@ function journeySections(goals, journey, oneTimeSchedules, now = new Date()) {
   ];
 }
 
-// Include collapsed child rows too; the forecast model removes completed work and
-// Steps represented by an unfinished Quest. Summary-only hidden completions stay out.
+// Forecast follows explicitly focused root groups, including their collapsed children.
+// Completed parents retain their unfinished children; Other Tasks never add workload.
 function journeyForecastGoals(goals, journey, now = new Date()) {
-  const roots = journeyGoals(goals, journey, now);
+  const today = normalizeJourney(journey, goals, GoalSchedule.dayKey(now));
+  const roots = journeyGoals(goals, today, now).filter(goal => today.focusIds.includes(goal.id));
   return roots.flatMap(goal => goal.type === 'quest'
     ? [goal, ...journeyChildren(goal, goals, journey, now)] : [goal]);
 }
@@ -2179,8 +2180,20 @@ function updateJourneyForecast(time, activate) {
   if (activate && JourneyForecast.deadline(time, now) <= now.getTime()) return false;
   const previous = structuredClone(state);
   const settings = JourneyForecast.normalize(state.journeyForecast);
-  const stillActive = settings.activeDate && JourneyForecast.deadline(settings.preferredEndTime, now) > now.getTime();
-  const next = { preferredEndTime: time, activeDate: activate || stillActive ? getDayKey() : '' };
+  const next = { ...settings, preferredEndTime: time, activeDate: activate ? getDayKey() : '' };
+  if (JSON.stringify(next) === JSON.stringify(state.journeyForecast)) return true;
+  state.journeyForecast = next;
+  if (!saveState()) { state = previous; return false; }
+  return true;
+}
+
+function updateJourneyForecastPreferences(change) {
+  syncStoredProgress();
+  const previous = structuredClone(state);
+  const next = JourneyForecast.normalize(state.journeyForecast);
+  for (const key of ['expanded', 'showIndicator']) {
+    if (typeof change[key] === 'boolean') next[key] = change[key];
+  }
   if (JSON.stringify(next) === JSON.stringify(state.journeyForecast)) return true;
   state.journeyForecast = next;
   if (!saveState()) { state = previous; return false; }
@@ -2396,15 +2409,28 @@ function renderJourney() {
   list.replaceChildren();
   const { done, total } = journeySummary(state.goals, journey, now);
   document.getElementById('journeyDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  document.getElementById('journeySummary').textContent = `${done} of ${total} completed${total && done === total ? ' · All done for today' : ''}`;
+  const summary = document.getElementById('journeySummary');
+  const suffix = ` completed${total && done === total ? ' · All done for today' : ''}`;
+  if (summary.textContent !== `${done} of ${total}${suffix}`) {
+    summary.replaceChildren(journeyElement('strong', '', String(done)), document.createTextNode(' of '),
+      journeyElement('strong', '', String(total)), document.createTextNode(suffix));
+  }
   const progress = document.getElementById('journeyProgress');
   progress.max = total || 1;
   progress.value = done;
+  const fill = document.getElementById('journeyProgressFill');
+  const width = `${total ? done / total * 100 : 0}%`;
+  if (fill.style.width !== width) fill.style.width = width;
+  // Paint initial/reloaded progress in place; animate only subsequent changes.
+  if (!fill.dataset.initialized) {
+    fill.dataset.initialized = 'true';
+    requestAnimationFrame(() => requestAnimationFrame(() => fill.classList.add('is-ready')));
+  }
+  let empty = null;
   if (!goals.length) {
-    const empty = journeyElement('div', 'journey-empty panel');
+    empty = journeyElement('div', 'journey-empty panel');
     empty.append(journeyElement('h2', '', 'Make room for today'), journeyElement('p', 'field-hint', 'Add something you’d like to work on. Scheduled goals appear here automatically.'));
     empty.append(journeyButton('+ Add a Goal', 'secondary-btn', openJourneyPicker));
-    list.append(empty);
   }
   for (const section of sections) {
     const container = journeyElement('section', 'journey-section');
@@ -2427,7 +2453,8 @@ function renderJourney() {
     toggle.append(chevron, journeyElement('span', '', section.title), journeyElement('span', 'journey-count', String(section.goals.length)));
     heading.append(toggle);
     container.append(heading, body);
-    if (!section.goals.length) body.append(journeyElement('p', 'journey-section-empty field-hint', {
+    if (section.key === 'other' && empty) body.append(empty);
+    else if (!section.goals.length) body.append(journeyElement('p', 'journey-section-empty field-hint', {
       focus: 'Choose what matters today. Move a task to Focus or add an existing goal.',
       other: 'Add a goal for today. Scheduled goals appear here automatically.',
       completed: 'Goals completed today will appear here.',
@@ -4672,6 +4699,7 @@ const forecastView = createJourneyForecastView({
   getState: () => state,
   getPlan: now => journeyForecastGoals(state.goals, state.journey, now),
   update: updateJourneyForecast,
+  updatePreferences: updateJourneyForecastPreferences,
 });
 
 browserReminders = createBrowserReminders({ getState: () => state, navigate: navigateToGoal });

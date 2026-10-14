@@ -42,7 +42,7 @@ async function run() {
   state.completionHistory.push({ id: 'r', goalId: 'g', skillId: 's', completionDate: Statistics.dayKey(), xpAwarded: 10 });
   Statistics.createArea(state, 'a', 'Learning', ['s']);
   state.journey = {date:Statistics.dayKey(),selectedIds:['once'],hiddenIds:[],orderIds:['once','scheduled'],focusIds:['once'],viewMode:'split',sortMode:'manual'};
-  state.journeyForecast = {preferredEndTime:'21:30',activeDate:Statistics.dayKey()};
+  state.journeyForecast = {preferredEndTime:'21:30',activeDate:Statistics.dayKey(),showIndicator:false,expanded:true};
   api.saveState();
   await api.pushToCloud();
   const sent = JSON.parse(writes[writes.length - 1].state);
@@ -59,7 +59,7 @@ async function run() {
   cloudReady = false;
   cloud = {updatedAt: state.updatedAt + 100, state: JSON.stringify(sent)};
   await api.pullFromCloud();
-  assert(state.journeyForecast.preferredEndTime === '21:30' && state.journeyForecast.activeDate === Statistics.dayKey(), 'active forecast survives remote migration');
+  assert(state.journeyForecast.showIndicator === false && state.journeyForecast.expanded === true && state.journeyForecast.preferredEndTime === '21:30' && state.journeyForecast.activeDate === Statistics.dayKey(), 'active forecast survives remote migration');
   assert(state.journey.focusIds.join() === 'once' && state.journey.viewMode === 'split' && state.journey.sortMode === 'manual' && state.journey.orderIds.join() === 'once,scheduled', 'remote Journey preferences and order survive migration');
   assert(state.goals[0].status === 'paused' && state.goals[0].remindersResumeAt === 1791540000000 && state.goals[1].status === 'active', 'remote statuses migrate and preserve cutoff');
   cloudReady = false;

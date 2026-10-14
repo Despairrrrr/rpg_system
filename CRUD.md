@@ -10,7 +10,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 |---|---|---|
 | Top navigation | **Today's Journey** → **Goals** → **Statistics**; no Skills tab | `index.html`, navigation handler in `app.js` |
 | Today presentation | Collapsible Today’s Focus / Other Tasks / Completed; explicit daily Focus; chronological groups or section-local My order; shared Goal membership and rewards | `renderJourney()`, `journeySections()`, `state.journey` |
-| Journey Forecast | Collapsible heuristic below Today progress; remembered target, explicit daily activation, live percentage, immediate active edits, explicit restart after expiry | `journey-forecast-model.js`, `journey-forecast.js`, `journeyForecastGoals()`, `state.journeyForecast` |
+| Journey Forecast | Compact Focus-only outlook below sorting; automatic updates, explicit daily target, persistent disclosure/indicator preferences; no visible percentage | `journey-forecast-model.js`, `journey-forecast.js`, `journeyForecastGoals()`, `state.journeyForecast` |
 | Goal scheduling | Step/Quest One-time and Repeating both show optional Time; only Repeating shows frequency/days. Reminders require a time | `index.html`, `skill.html`, `app.js`, `schedule-model.js` |
 | Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
 | Profile photo | Empty circle with a **+** by default; opens the shared **…** menu with **Load a photo** and **Delete photo**; Delete is disabled while there is no photo | `#profileAvatar`, `#profilePhotoInput`, `renderAvatar()`, `PHOTO_MENU_ITEMS` |
@@ -104,31 +104,42 @@ resume, storage and cloud paths handle rollover without changing history or bump
 Quest deduplication. Hidden unfinished goals are excluded; undo elsewhere removes their retained
 completion. Older/undated completions are not counted as today or fabricated into history. The
 picker labels older completions and disables their selection; existing Goals actions remain
-available on the separate Goals page. Forecast retains its original roots/children membership
-and formulas, including Other Tasks and children of completed Quests, independently of sections.
+available on the separate Goals page. Forecast uses explicitly focused root groups and their
+children, independently of collapse/sort; Other Tasks no longer contribute. Its formula is unchanged.
 
 ## Journey Forecast
 
-The compact native disclosure below Today progress keeps its percentage, risk label and target
-visible while collapsed. Choose a local time and Calculate; Edit target applies changes immediately
-while active. On expiry with work left, show Time’s up without extending the deadline. Choose a later
-time and Calculate to restart. Empty work hides the percentage but keeps the control available.
+The header uses Georgia/serif for the date (14px) and counter (15px, tabular numerals with
+emphasized counts). The existing native progress retains its completed/total semantics; a stable
+visual sibling draws an 8px antique-gold gradient (#8C6425 → #B8842F → #D6A85A) on beige #D8C5A0.
+Its desktop track is 65% wide, capped at 700px, and 100% at ≤720px. Only changed values animate
+for 300ms; initial/reloaded values paint in place and reduced motion disables transitions.
 
-`state.journeyForecast = { preferredEndTime: "21:00", activeDate: "" }` is the default.
-Activation records today's local date; changing the time remembers it. Migration retains activation
-only on the matching local date and defaults malformed time to 21:00/inactive. The next day retains
-the preference and requires activation again; an open tab expands the panel so Calculate is one interaction away. Settings use the ordinary state save/cloud mirror and
-rollback. Day normalization uses existing maintenance saves, preserving updatedAt. Expiry is derived,
-not repeatedly persisted; no stored probability, extra localStorage key or Firebase document.
+The 48px collapsed native disclosure now follows By time / My order and sits 12px above the
+Journey list. It shows a chevron, title, optional 14px status circle and active target time.
+With an empty plan, the existing add-goal prompt appears inside Other Tasks, keeping Focus
+immediately beneath Forecast. There is no visible percentage, Calculate button or formula. Expanded content contains the time,
+**Use this target today**, a brief status explanation, and **Show status indicator**.
+Changing a valid future time explicitly activates it for today and updates immediately; checking
+Use this target today reuses an unchanged remembered time. Unchecking deactivates it. A passed
+or invalid time is rejected without overwriting the saved target. Expiry never extends a deadline;
+an explicit edit to a later time restarts. New Focus goals and a new day never silently activate time.
 
-The pure `JourneyForecast` module depends on Statistics and GoalSchedule. Load it, then
-`journey-forecast.js`, after schedule-model and before app.js on both Goal pages. The view factory
-returns null on the Skill page. `journeyForecastGoals()` reuses Journey roots and nested children,
-including collapsed rows; it does not use the summary's retained hidden completions. Work is deduplicated
-by ID and independent of presentation/order. Include today's automatic recurrences and manual selections
-(including paused); exclude hidden, absent, completed and Arc goals. Unfinished included Quests cover
-all their Steps without partial reduction. When the parent is absent or completed, a remaining included
-Step contributes separately. Step/Quest goals beneath Arcs count normally.
+`state.journeyForecast = { preferredEndTime: "21:00", activeDate: "", showIndicator: true,
+expanded: false }` is the default. Normalization is idempotent and retains activation only for
+the matching local day. Time and both UI preferences persist across days/reloads and travel through
+the existing single-document storage/cloud mirror with rollback. Task section collapse remains
+session-only; Forecast disclosure is persisted. Status updates and day changes never auto-expand it.
+`updateJourneyForecastPreferences()` saves only actual explicit preference changes; native toggle
+events caused by restoring saved state do not trigger another write.
+
+`journeyForecastGoals()` first applies existing Journey root eligibility, then filters roots by the
+current day's `focusIds` and expands their existing `journeyChildren()`. Other Tasks, hidden/absent
+roots and dormant Focus IDs of children beneath an unfocused Quest do not contribute. Root and
+child hierarchy is otherwise unchanged: unfinished Quests cover child Steps; if a focused Quest
+is completed, its unfinished nested children still count. Independently visible focused Steps
+count on their own. Completed roots remain in the input so empty Focus and completed work differ.
+The pure workload model continues to exclude completed Goals/Arcs and deduplicate by ID.
 
 | Work | Estimated minutes |
 |---|---|
@@ -136,19 +147,18 @@ Step contributes separately. Step/Quest goals beneath Arcs count normally.
 | Quest: 200 XP / 350 XP / 500 XP | 105 / 180 / 210 |
 | Quest: custom XP | Nearest preset; ties choose lower XP (275 → 105 min, 425 → 180 min) |
 
-Valid XP is a finite nonnegative integer (numeric strings accepted); invalid counted XP shows Check goal XP.
-`AVAILABLE_TIME_FACTOR = 0.75`; `T = max(0, minutes until local target) × factor`, `W = remaining
-estimated minutes`, `P = 100*T²/(T²+W²)`. Computation stays real-valued and display rounds/clamps 0–100.
-Displayed 75–100 = green Good outlook; 40–74 = yellow At risk; 0–39 = red High risk.
-This is an approximate heuristic, not a calibrated probability. Local deadlines use native Date/DST
-semantics and never silently move to tomorrow. Inactive, completed, expired and unavailable states hide P.
+The original model is unchanged: `AVAILABLE_TIME_FACTOR = 0.75`, usable minutes T, estimated
+work W, `P = 100*T²/(T²+W²)`. Rounded internal P selects the existing thresholds: 75+ Good outlook,
+40–74 At risk, below 40 High risk. The new circle uses #518763 / #CE9C39 / #A54C4C respectively.
+Expired work is red with Time’s up. No Focus, inactive target, unavailable data, or completed work
+has no risk circle; the explanation and screen-reader status identify the reason (including
+Focus complete). Hiding the indicator never disables calculation. Invalid counted XP fails safely.
 
-`updateJourneyForecast()` handles settings; `createJourneyForecastView()` updates stable panel DOM.
-The existing reminder lifecycle refreshes it roughly every minute, after Goal changes/render and on
-focus/pageshow/visibility/storage. It uses actual time, adds no timer and writes no state for percentage
-updates. Goal addition/removal/completion/undo/XP/parent edits affect the next render. Forecast never
-changes rewards, completion history, reminders or Statistics. Keyboard focus and time drafts survive
-refresh; disclosure motion respects reduced-motion preferences.
+`createJourneyForecastView()` updates stable DOM, preserving focus and uncommitted time drafts.
+The existing reminder lifecycle handles minute ticks, Goal/Focus/CRUD renders, resume and storage
+updates; no new interval or calculation-time writes. Settings use the ordinary save/rollback path.
+The view factory still returns null on skill.html. Rewards, history, schedules, reminders, Statistics
+and section membership are not changed by forecasting.
 
 ## Active / Paused Goals
 

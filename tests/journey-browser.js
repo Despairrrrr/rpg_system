@@ -116,6 +116,9 @@
     const populated = structuredClone(state);
     state.goals=[]; state.skills=[]; render();
     assert(document.querySelector('.journey-empty'), 'welcoming empty state');
+    assert(document.getElementById('journeyList').firstElementChild.dataset.journeySection === 'focus' &&
+      document.querySelector('.journey-empty').closest('[data-journey-section]').dataset.journeySection === 'other',
+      'empty plan keeps Focus directly beneath Forecast, with existing add prompt in Other');
     openJourneyPicker(); document.getElementById('createJourneyGoal').click();
     assert(els.skillModal.open && !els.goalModal.open && !state.goals.length, 'no Skills routes to existing Skill creation');
     els.skillModal.close(); state=populated; render();

@@ -1968,10 +1968,16 @@ button:disabled { cursor: default; opacity: .4; }
 #journeyPage { min-width: 0; }
 #journeyPage .section-head { gap: 12px; flex-wrap: wrap; }
 #journeyPage h1 { text-transform: none; }
-#journeySummary { color: var(--muted); font-size: 14px; margin: 18px 0 8px; }
-#journeyProgress { width: 100%; height: 5px; border: 0; border-radius: 8px; background: var(--bg-deep); accent-color: var(--blue); margin-bottom: 20px; }
-#journeyProgress::-webkit-progress-bar { background: var(--bg-deep); border-radius: 8px; }
-#journeyProgress::-webkit-progress-value { background: var(--blue); border-radius: 8px; }
+#journeyDate { margin: 10px 0 0; font: 14px/1.5 Georgia, 'Times New Roman', serif; color: var(--ink-soft); }
+#journeySummary { margin: 8px 0; font: 15px/1.5 Georgia, 'Times New Roman', serif; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+#journeySummary strong { font-weight: 700; color: var(--ink); }
+.journey-progress-track { position: relative; width: 65%; max-width: 700px; height: 8px; margin: 0 0 18px; overflow: hidden; border-radius: 4px; background: #D8C5A0; box-shadow: inset 0 1px 1px #8C64251A; }
+/* Native progress supplies semantics; its stable sibling supplies consistent animation. */
+#journeyProgress { position: absolute; inset: 0; width: 100%; height: 8px; margin: 0; opacity: 0; }
+#journeyProgressFill { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8C6425, #B8842F 45%, #D6A85A); }
+#journeyProgressFill.is-ready { transition: width 300ms ease-out; }
+@media (max-width: 720px) { .journey-progress-track { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { #journeyProgressFill.is-ready { transition: none; } }
 #journeyList { display: grid; gap: 22px; }
 #journeyPage { max-width: 1040px; width: 100%; }
 .journey-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 0 0 18px; }
@@ -2055,31 +2061,36 @@ button:disabled { cursor: default; opacity: .4; }
   .activity-segment.is-animating { transition: none; }
 }
 
-/* A compact planning estimate; disclosure and input keep their DOM/focus on updates. */
-.forecast-panel { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-deep); }
-#forecastSummary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; cursor: pointer; list-style: none; min-height: 28px; }
+/* Focus outlook: one compact disclosure, with no layout rebuild on clock ticks. */
+.forecast-panel { margin: 0 0 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+#forecastSummary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; min-height: 46px; }
 #forecastSummary::-webkit-details-marker { display: none; }
-#forecastSummary::before { content: '›'; color: var(--muted); transform: rotate(0deg); transition: transform var(--motion-check) var(--ease-out); }
+#forecastSummary::before { content: '›'; flex-shrink: 0; color: var(--muted); transform: rotate(0deg); transition: transform var(--motion-check) var(--ease-out); }
 #journeyForecast[open] #forecastSummary::before { transform: rotate(90deg); }
 .forecast-title { font-size: 14px; font-weight: 600; }
-.forecast-result { margin-left: auto; display: inline-flex; align-items: baseline; gap: 8px; min-height: 24px; color: var(--muted); font-size: 12px; }
-#forecastPercent { min-width: 4ch; text-align: right; font-size: 20px; font-variant-numeric: tabular-nums; }
-#journeyForecast[data-risk="good"] .forecast-result { color: var(--green); }
-#journeyForecast[data-risk="at-risk"] .forecast-result { color: var(--yellow); }
-#journeyForecast[data-risk="high-risk"] .forecast-result { color: var(--red); }
-.forecast-content { padding-top: 12px; }
-#forecastForm label { display: block; margin-bottom: 10px; font-size: 13px; }
-.forecast-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-#forecastEndTime { width: 132px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--text); background: var(--panel); }
-.forecast-controls button { padding: 9px 12px; }
+.forecast-result { margin-left: auto; display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+#forecastTarget { font-variant-numeric: tabular-nums; }
+#forecastIndicator { width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%; background: var(--forecast-status); border: 1px solid #2A221833; }
+#journeyForecast[data-risk="good"] { --forecast-status: #518763; }
+#journeyForecast[data-risk="at-risk"] { --forecast-status: #CE9C39; }
+#journeyForecast[data-risk="high-risk"] { --forecast-status: #A54C4C; }
+.forecast-content { padding: 10px 0 12px; border-top: 1px solid var(--border-soft); }
+.forecast-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+#forecastPrompt { font: 14px/1.4 Georgia, 'Times New Roman', serif; color: var(--ink-soft); }
+#forecastEndTime { width: 112px; min-width: 0; border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; color: var(--text); background: var(--bg); font: 13px var(--font-ui); }
+.forecast-option { display: inline-flex; align-items: center; gap: 7px; font: 12px/1.5 var(--font-ui); color: var(--muted); cursor: pointer; }
+.forecast-option input { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--gold); }
+.forecast-description { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-top: 10px; }
+#forecastDetails { flex: 1 1 250px; margin: 0; font-size: 12px; }
+#forecastError { margin: 8px 0 0; font-size: 12px; }
 #forecastError:empty { display: none; }
-.forecast-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
-#forecastEdit { border: 0; border-radius: 4px; background: transparent; padding: 5px 0 5px 8px; color: var(--blue); font-size: 12px; }
-.forecast-panel :is(summary, input, button):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+.forecast-panel :is(summary, input):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+#journeyPage .journey-toolbar { margin-bottom: 12px; }
+#journeyOrderHint { margin-bottom: 12px; }
 @media (max-width: 480px) {
-  .forecast-panel { padding: 10px 12px; }
-  #forecastSummary { gap: 6px 8px; }
-  .forecast-result { gap: 5px; }
+  .forecast-panel { padding-inline: 10px; }
+  #forecastSummary { gap: 7px; }
+  .forecast-result { gap: 7px; }
 }
 @media (prefers-reduced-motion: reduce) { #forecastSummary::before { transition: none; } }
 
@@ -2202,7 +2213,6 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .journey-expand { color: var(--accent-text); }
 .journey-group-title { font-style: italic; }
 .forecast-panel { background: color-mix(in srgb, var(--surface) 65%, var(--bg)); }
-#journeyProgress::-moz-progress-bar { background: var(--gold); border-radius: 8px; }
 .avatar { color: var(--gold-soft); background: var(--bg-deep); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 12%, transparent); }
 .avatar:hover { border-color: var(--gold-soft); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 22%, transparent); }
 .level-row { color: var(--muted); }
