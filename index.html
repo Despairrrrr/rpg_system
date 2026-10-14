@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Goal Tracker</title>
   <!-- ?v=N: GitHub Pages serves these with a 10 min cache, bump N on every deploy. -->
-  <link rel="stylesheet" href="styles.css?v=22" />
+  <link rel="stylesheet" href="styles.css?v=23" />
 </head>
 <body>
   <header class="topbar">
@@ -58,16 +58,12 @@
         <div class="forecast-footer"><span id="forecastTarget">Finish today at your own pace</span><button type="button" id="forecastEdit" hidden>Edit target</button></div>
       </section>
       <div class="journey-toolbar">
-        <div class="journey-segments" role="group" aria-label="Today's Journey view">
-          <button type="button" data-journey-view="all" aria-pressed="true">All Tasks</button>
-          <button type="button" data-journey-view="split" aria-pressed="false">Journey &amp; Routine</button>
-        </div>
         <div class="journey-segments journey-sort" id="journeySort" role="group" aria-label="Task order">
           <button type="button" data-journey-sort="time" aria-pressed="true">By time</button>
           <button type="button" data-journey-sort="manual" aria-pressed="false">My order</button>
         </div>
       </div>
-      <p id="journeyOrderHint" class="field-hint" hidden>Use the arrows to arrange today's tasks. Scheduled times stay the same.</p>
+      <p id="journeyOrderHint" class="field-hint" hidden>Use the arrows to arrange tasks within each section. Scheduled times stay the same.</p>
       <p id="journeyOrderStatus" class="journey-sr-only" role="status"></p>
       <div id="journeyList"></div>
     </section>
@@ -227,6 +223,8 @@
       <div class="modal-head"><h2 id="journeyPickerTitle">Add a Goal</h2><button type="button" class="close-btn" data-close="journeyPicker" aria-label="Close goal picker">×</button></div>
       <button type="button" class="primary-btn" id="createJourneyGoal">Create a new goal</button>
       <label>Add an existing goal<input type="search" id="journeySearch" placeholder="Search goals or Skills" /></label>
+      <label>Add existing goals to<select id="journeyDestination"><option value="other">Other Tasks</option><option value="focus">Today's Focus</option></select></label>
+      <p class="field-hint">Nested Steps stay with their visible Quest. Choosing a Step moves that Quest group. New goals start in Other Tasks.</p>
       <div id="journeyChoices"></div>
     </div>
   </dialog>
@@ -445,6 +443,6 @@
   <script src="journey-forecast-model.js?v=1"></script>
   <script src="journey-forecast.js?v=1"></script>
   <script src="reminders.js?v=2"></script>
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>

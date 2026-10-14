@@ -61,19 +61,31 @@ any goal, including a nested Step, for today; add it again through the picker wh
 Hiding a completed Goal keeps it in today’s completed/total summary and progress bar.
 Hiding an unfinished Goal removes it from the total. Undo elsewhere removes a hidden
 completion from the summary; restoring it never counts it twice.
-Choose **All Tasks** for a unified list or **Journey & Routine** to separate manually
-chosen goals from automatic recurring tasks. A manually selected routine appears once,
-in Journey; child Steps stay beneath their visible Quest. Both views share the same count.
+Today's plan has three independently collapsible sections: **Today's Focus**, **Other Tasks**,
+and **Completed**. Focus is an explicit choice for this local day only: use the bookmark
+on an incomplete card or choose **Today's Focus** in the existing-goal picker. The picker
+can also move an already included goal. Scheduled habits, ordinary selections and new goals
+start in Other Tasks. There is no priority limit or automatic priority selection.
 
-**By time** orders today's configured times, with untimed goals under **Anytime**.
-**My order** provides keyboard-accessible up/down buttons and remembers today's sequence,
-even after changing views or sorting. Completed goals stay visible in place for easy undo.
-Compact rows wrap longer content, and Quests expand without reserving empty space.
+Completed is initially collapsed. Completion moves a top-level goal there; expand it to undo
+using its checkbox. Undo restores its Focus membership and manual order through the normal
+XP/history mechanism. Only completions recorded for today count as today's completed work;
+older or undated completions are not relabelled. Hidden completed goals remain counted but
+stay hidden. Nested Steps stay with their visible Quest, including completed children; they
+never also appear as top-level completions. Choosing a nested Step's destination in the picker
+explicitly moves the visible Quest group, as explained in the picker. A child's independently
+saved Focus membership never automatically makes its parent a priority.
 
-View/sort preferences persist in the ordinary local state and Firebase mirror. Manual
-selections, removals and custom ordering clear on the next local day; preferences remain. All views share the same
-Goals, XP and history, and the Skills sidebar animates completion and undo progress.
-No quotas, penalties or separate daily rewards are added.
+**By time** orders today's configured times within each active section, with untimed goals
+under **Anytime**. **My order** uses keyboard-accessible up/down controls within each section.
+The saved daily sequence survives moving sections, completion/undo and sort changes.
+
+Daily `focusIds`, selection, hiding and order use the existing local state and Firebase mirror;
+normalization validates IDs and clears them on the next local day. Sort preference persists.
+Section expansion is session-only and survives view switches and ordinary rerenders without
+storage/cloud writes. A page reload starts with Focus/Other expanded and Completed collapsed.
+Forecast continues to count all remaining planned work, regardless of Focus or collapse.
+All views share existing Goals, XP and history; no separate rewards or completion records.
 
 Pause a Step, Quest or Arc through its **…** menu to stop automatic Today inclusion
 and reminders. Descendants inherit the pause without changing their own statuses.

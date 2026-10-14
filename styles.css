@@ -2294,3 +2294,16 @@ body { transition: background-color var(--motion-view) ease-out; }
   body, .topbar, .nav-item { transition: none; }
   .view-entering { animation: none; }
 }
+
+/* Today's sections retain the parchment surfaces and existing card hierarchy. */
+.journey-section-toggle { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 6px 8px; border: 0; border-bottom: 1px solid var(--border-soft); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.journey-section[data-journey-section="focus"] .journey-section-toggle { color: var(--accent-text); border-bottom-color: var(--gold); }
+.journey-section[data-journey-section="completed"] .journey-section-toggle { color: var(--muted); }
+.journey-chevron { width: 12px; flex-shrink: 0; }
+.journey-section-body { display: grid; gap: 14px; min-width: 0; }
+.journey-section-body[hidden] { display: none; }
+.journey-focus-toggle { display: grid; place-items: center; flex: 0 0 28px; min-height: 32px; padding: 4px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
+.journey-focus-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.journey-focus-toggle[aria-pressed="true"] { color: var(--accent-text); }
+.journey-focus-toggle[aria-pressed="true"] svg { fill: color-mix(in srgb, var(--gold) 25%, transparent); }
+.journey-focus-toggle:hover { background: color-mix(in srgb, var(--gold) 15%, transparent); }

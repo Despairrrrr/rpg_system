@@ -58,7 +58,7 @@
     assert(els.goalModal.open && els.goalType.querySelector('[value="arc"]').disabled, 'existing creation form limits Today to Step/Quest');
     els.goalTitle.value='Created today'; els.goalSkill.value='s'; els.goalForm.dispatchEvent(new Event('submit',{cancelable:true}));
     const created = state.goals.find(g=>g.title==='Created today');
-    assert(created && card(created.id), 'created goal immediately selected');
+    assert(created && card(created.id).closest('[data-journey-section]').dataset.journeySection === 'other' && !state.journey.focusIds.includes(created.id), 'created goal immediately selected');
     openGoalModal(null,'step',null,true); els.goalModal.close(); openGoalModal(null,'arc');
     assert(!els.goalType.querySelector('[value="arc"]').disabled, 'ordinary CRUD retains Arc'); els.goalModal.close();
     changeJourneySelection('quest',true);
@@ -100,7 +100,7 @@
     assert(document.getElementById('journeyProgress').max===progressBeforeHide && document.getElementById('journeyProgress').value===progressBeforeHide, 'hidden completion preserves progress bar');
     assert(JSON.stringify([state.goals,state.skills,state.completionHistory])===completedFacts, 'hiding completion preserves XP and facts');
     state=migrateState(JSON.parse(localStorage.getItem(STORAGE_KEY)));render();
-    document.querySelector('[data-journey-view="split"]').click();
+    document.querySelector('[aria-controls="journey-section-completed"]').click();
     assert(document.getElementById('journeySummary').textContent===summaryBeforeHide, 'hidden completion survives reload and switching views');
     document.querySelector('[data-section="goals"]').click();
     document.querySelector('.goal-card[data-id="manual"] input').click();
@@ -112,7 +112,7 @@
     assert(document.getElementById('journeyProgress').max===progressBeforeHide-1, 'hiding unfinished Goal reduces total');
     changeJourneySelection('manual',true);toggleGoalCompletion('manual',true);
     assert(document.getElementById('journeySummary').textContent===summaryBeforeHide, 'restore and recompletion do not duplicate count');
-    document.querySelector('[data-journey-view="all"]').click();
+    document.querySelector('[aria-controls="journey-section-completed"]').click();
     const populated = structuredClone(state);
     state.goals=[]; state.skills=[]; render();
     assert(document.querySelector('.journey-empty'), 'welcoming empty state');

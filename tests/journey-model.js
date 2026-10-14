@@ -16,7 +16,7 @@ const goals = [
 ];
 const today = GoalSchedule.dayKey(monday);
 const fresh = api.normalizeJourney(null, goals, today);
-assert(JSON.stringify(fresh)===JSON.stringify({date:today,selectedIds:[],hiddenIds:[],orderIds:[],viewMode:'all',sortMode:'time'}), 'legacy state gains empty daily selection');
+assert(JSON.stringify(fresh)===JSON.stringify({date:today,selectedIds:[],hiddenIds:[],orderIds:[],focusIds:[],viewMode:'all',sortMode:'time'}), 'legacy state gains empty daily selection');
 const ids = (selection, date=monday) => api.journeyGoals(goals,selection,date).map(goal=>goal.id).join();
 assert(ids(fresh)==='d,q,legacy', 'uses schedules and legacy fallback, deduplicates nested child');
 const selection = {date:today,selectedIds:['d','m','m','a','missing'],hiddenIds:['q','q']};
@@ -50,21 +50,33 @@ assert(api.journeyTime({...timed[4],createdAt:'invalid'}, {}, monday)==='', 'mis
 assert(api.journeyTime(timed[4],{once:{day:'2026-10-06',configuredAt:monday.getTime()}},monday)==='', 'explicit one-time anchor takes precedence over creation date');
 assert(names(api.orderJourneyGoals(timed,preferences,{},monday,true))==='evening,any,morning-a,morning-b,once,offday,past', 'manual IDs first; missing/new IDs appended predictably');
 assert(preferences.orderIds.join()==='evening,any,morning-a', 'order drops obsolete IDs and duplicates');
-const split = api.journeySections(timed,preferences,{},monday);
-assert(names(split[0].goals)==='once,evening,any,offday,past' && names(split[1].goals)==='morning-a,morning-b', 'manually selected routine belongs only to Journey; split ignores custom order');
-const all = api.journeySections(timed,{...preferences,viewMode:'all',sortMode:'time'},{},monday);
-assert(names(all[0].goals)===timeOrder && new Set(split.flatMap(section=>section.goals.map(goal=>goal.id))).size===all[0].goals.length, 'both modes share distinct membership');
-timed[3].completed=true;
-assert(names(api.journeySections(timed,{...preferences,viewMode:'all',sortMode:'time'},{},monday)[0].goals)===timeOrder, 'completion does not move cards');
+preferences.focusIds = ['evening', 'once'];
+const sections = api.journeySections(timed,preferences,{},monday);
+assert(names(sections[0].goals)==='evening,once' && names(sections[1].goals)==='any,morning-a,morning-b,offday,past', 'manual order applies independently in Focus and Other');
+assert(!sections[2].goals.length, 'Completed starts empty');
+const byTime = api.journeySections(timed,{...preferences,sortMode:'time'},{},monday);
+assert(names(byTime[0].goals)==='once,evening' && names(byTime[1].goals)==='morning-a,morning-b,any,offday,past','time grouping respects sections');
+assert(new Set(sections.flatMap(section=>section.goals.map(goal=>goal.id))).size===timed.length,'no top-level duplicates');
+timed[0].completed=true; timed[0].completedDay=today;
+timed[3].completed=true; timed[3].completedDay=today;
+const completed = api.journeySections(timed,preferences,{},monday);
+assert(names(completed[0].goals)==='once' && names(completed[2].goals)==='evening,morning-a','both sections move completion to Completed');
+assert(preferences.focusIds.includes('evening'),'completion retains Focus');
+timed[0].completed=false; timed[3].completed=false;
+assert(JSON.stringify(api.journeySections(timed,preferences,{},monday))===JSON.stringify(sections),'undo restores section and manual order');
+const noFocus=api.journeySections(timed,{...preferences,focusIds:[]},{},monday);
+assert(!noFocus[0].goals.length && noFocus[1].goals.length===timed.length,'no implicit priority from selection, XP, time or recurrence');
+const cleaned=api.normalizeJourney({...preferences,focusIds:['once','once','deleted']},timed,today);
+assert(cleaned.focusIds.join()==='once','Focus IDs are valid and unique');
 const rolled = api.normalizeJourney(preferences,timed,GoalSchedule.dayKey(tuesday));
-assert(rolled.viewMode==='split' && rolled.sortMode==='manual' && !rolled.orderIds.length && !rolled.selectedIds.length, 'day rollover retains preferences but clears daily order and selections');
+assert(rolled.viewMode==='split' && rolled.sortMode==='manual' && !rolled.orderIds.length && !rolled.selectedIds.length && !rolled.focusIds.length, 'day rollover retains preferences but clears daily order and selections');
 const malformed=api.normalizeJourney({date:today,viewMode:'bad',sortMode:{},orderIds:'bad'},timed,today);
 assert(malformed.viewMode==='all' && malformed.sortMode==='time' && !malformed.orderIds.length, 'safe presentation defaults');
 assert(JSON.stringify(api.normalizeJourney(preferences,timed,today))===JSON.stringify(preferences), 'presentation migration idempotent');
 (typeof print==='function'?print:console.log)('PASS: Journey views, time relevance, deterministic ties, manual ordering, stable completion and daily preference normalization');
 
 const progressGoals = [
-  {id:'done',type:'step',completed:true,status:'paused'},
+  {id:'done',type:'step',completed:true,completedDay:today,status:'paused'},
   {id:'open',type:'step',completed:false},
 ];
 const progressSelection = {date:today,selectedIds:['done','open'],hiddenIds:[]};
@@ -79,7 +91,7 @@ assert(progress({...progressSelection,selectedIds:['done'],hiddenIds:['open']}).
 assert(progress(progressSelection,tuesday).total===0,'retention ends with date-scoped hiding');
 progressGoals[0].completed=false;
 assert(progress().done===0 && progress().total===0,'undo elsewhere removes hidden completion from both counts');
-const nested=[{id:'q',type:'quest',completed:true,schedule:{type:'daily'}},{id:'c',type:'step',completed:true,parentGoalId:'q',schedule:{type:'daily'}}];
+const nested=[{id:'q',type:'quest',completed:true,completedDay:today,schedule:{type:'daily'}},{id:'c',type:'step',completed:true,completedDay:today,parentGoalId:'q',schedule:{type:'daily'}}];
 const nestedSelection={date:today,hiddenIds:['c']};
 assert(api.journeySummary(nested,nestedSelection,monday).total===1,'hidden nested Step not counted twice');
 nestedSelection.hiddenIds=['q'];
@@ -88,3 +100,17 @@ const snapshot=JSON.stringify([nested,nestedSelection]);
 api.journeySummary(nested,nestedSelection,monday);
 assert(snapshot===JSON.stringify([nested,nestedSelection]),'summary derives counts without mutation or stored totals');
 (typeof print==='function'?print:console.log)('PASS: hidden completed/unfinished Goals, restore, undo, rollover and nested summary counts');
+
+const hierarchy=[{id:'q',type:'quest',schedule:{type:'daily'}},{id:'c',type:'step',parentGoalId:'q',schedule:{type:'daily'},completed:true,completedDay:today}];
+const hierarchyPlan={date:today,focusIds:['c']};
+let grouped=api.journeySections(hierarchy,hierarchyPlan,{},monday);
+assert(!grouped[0].goals.length && names(grouped[1].goals)==='q' && !grouped[2].goals.length,'child focus never implicitly prioritizes parent or duplicates nested completion');
+hierarchyPlan.focusIds=['q'];
+grouped=api.journeySections(hierarchy,hierarchyPlan,{},monday);
+assert(names(grouped[0].goals)==='q' && !grouped[1].goals.length,'parent Focus keeps hierarchy together');
+hierarchyPlan.hiddenIds=['q'];
+assert(names(api.journeySections(hierarchy,hierarchyPlan,{},monday)[2].goals)==='c','independently due child surfaces only when parent absent');
+const old=[{id:'old',type:'step',completed:true,completedDay:'2026-10-01'}, {id:'unknown',type:'step',completed:true}];
+const oldPlan={date:today,selectedIds:['old','unknown']};
+assert(api.journeySections(old,oldPlan,{},monday).every(s=>!s.goals.length) && api.journeySummary(old,oldPlan,monday).done===0,'historical and undated completion never fabricated as today');
+(typeof print==='function'?print:console.log)('PASS: Focus membership, completion/undo, section ordering, hierarchy and historical completion exclusion');

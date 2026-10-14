@@ -34,8 +34,8 @@ assert(work([make('one'),make('two')],['one','two']).minutes===10,'same titles a
 const selected={date:today,selectedIds:['one'],hiddenIds:[]};
 const plan=[make('one'),make('two','step',{schedule:{type:'daily'}})];
 const baseline=JourneyForecast.workload(api.journeyForecastGoals(plan,selected,now)).minutes;
-assert(JourneyForecast.workload(api.journeyForecastGoals(plan,{...selected,viewMode:'split',sortMode:'manual',orderIds:['two','one']},now)).minutes===baseline,'presentation/reordering do not change membership');
-const hiddenDone=[make('done','step',{completed:true})];
+assert(JourneyForecast.workload(api.journeyForecastGoals(plan,{...selected,viewMode:'split',focusIds:['one'],collapsedSections:{focus:true,other:true,completed:true},sortMode:'manual',orderIds:['two','one']},now)).minutes===baseline,'presentation/reordering do not change membership');
+const hiddenDone=[make('done','step',{completed:true,completedDay:today})];
 const hiding={date:today,hiddenIds:['done']};
 assert(api.journeySummary(hiddenDone,hiding,now).done===1 && JourneyForecast.workload(api.journeyForecastGoals(hiddenDone,hiding,now)).minutes===0,'hidden completed summary is not forecast work');
 for (const [available,workload,expected] of [[10,10,50],[20,10,80],[5,10,20],[30,10,90],[0,10,0]]) assert(close(JourneyForecast.percentage(available,workload),expected),'smooth formula');

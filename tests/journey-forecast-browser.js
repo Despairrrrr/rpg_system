@@ -49,8 +49,8 @@
       advance(12,16);
       assert(number()===50 && writes===saved && state.updatedAt===timestamp,'clock tick updates percentage with no state write');
       assert(input===$('forecastEndTime') && summary===$('forecastSummary') && Math.abs($('journeyList').getBoundingClientRect().top-top)<1,'ticks preserve controls/focus/layout');
-      const viewValue=number();document.querySelector('[data-journey-view="split"]').click();assert(number()===viewValue,'split view invariant');
-      document.querySelector('[data-journey-view="all"]').click();document.querySelector('[data-journey-sort="manual"]').click();moveJourneyGoal('s1',1);assert(number()===viewValue,'sort/reorder invariant');
+      const viewValue=number();document.querySelector('[aria-controls="journey-section-other"]').click();assert(number()===viewValue,'collapsed Other Tasks remain forecast work');
+      document.querySelector('[aria-controls="journey-section-other"]').click();changeJourneySelection('s1',true,true);assert(number()===viewValue,'Focus membership leaves forecast unchanged');document.querySelector('[data-journey-sort="manual"]').click();moveJourneyGoal('s1',1);assert(number()===viewValue,'sort/reorder invariant');
       document.querySelector('#journeyList [data-goal-id="s1"] input').click();assert(number()>viewValue && state.completionHistory.length===1,'completion reduces workload');
       document.querySelector('#journeyList [data-goal-id="s1"] .journey-remove').click();assert(number()>viewValue && state.skills[0].xp===125,'hiding completed Goal retains reward but never adds work');
       changeJourneySelection('s1',true);toggleGoalCompletion('s1',false);assert(number()===viewValue,'restore and undo restore workload');

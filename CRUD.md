@@ -9,7 +9,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Surface | Accepted behavior | Implementation |
 |---|---|---|
 | Top navigation | **Today's Journey** → **Goals** → **Statistics**; no Skills tab | `index.html`, navigation handler in `app.js` |
-| Today presentation | Compact All Tasks / Journey & Routine views; chronological time groups or date-scoped My order; both share Goal membership and rewards | `renderJourney()`, `journeySections()`, `state.journey` |
+| Today presentation | Collapsible Today’s Focus / Other Tasks / Completed; explicit daily Focus; chronological groups or section-local My order; shared Goal membership and rewards | `renderJourney()`, `journeySections()`, `state.journey` |
 | Journey Forecast | Collapsible heuristic below Today progress; remembered target, explicit daily activation, live percentage, immediate active edits, explicit restart after expiry | `journey-forecast-model.js`, `journey-forecast.js`, `journeyForecastGoals()`, `state.journeyForecast` |
 | Goal scheduling | Step/Quest One-time and Repeating both show optional Time; only Repeating shows frequency/days. Reminders require a time | `index.html`, `skill.html`, `app.js`, `schedule-model.js` |
 | Header actions | Search, sign-in and a functional reminder bell; no inactive settings buttons | `index.html`, `skill.html`, `reminders.js` |
@@ -43,55 +43,61 @@ validation, optional fields, save-failure rollback and reminder refresh live in 
 
 ## Today's Journey
 
-Today's Journey is the default tab and shares the Goals sidebar. It presents existing
-Steps and Quests in **All Tasks** (the default) or **Journey & Routine**, using `GoalSchedule.effective()` / `occursOn()` for today's
-recurring effectively active goals. One-time goals appear only when manually selected. Direct child Steps
-are expandable inside their Quest when effectively active or explicitly selected, never duplicated as top-level entries while it is shown.
-A child that is independently due/selected can appear on its own when its Quest is hidden.
-Completion and undo reuse `toggleGoalCompletion()`, including history, streaks, player/Skill
-XP, level feedback and progress animation. Completed goals stay visible in their existing
-position, including inside Quests, so completion never rearranges the list. The summary
-counts distinct top-level goals only and does not change when switching views.
-`journeySummary()` also retains hidden completed Goals in both completed and total counts;
-hidden unfinished Goals are excluded. Retained Quests still group their Steps for summary
-purposes, preventing double counting when hiding a Quest exposes a child row. Counts are
-derived from current completion state and date-scoped `hiddenIds`, not stored separately.
-Undo from Goals or the Skill page removes a hidden completion from the summary. Restoring
-a Goal through the picker does not duplicate it; the next day clears hidden membership.
+Today's Journey is the default tab and shares the Goals sidebar. Existing Steps and Quests
+appear automatically when effectively active and scheduled for today, or through explicit
+manual selection regardless of pause. × hides a goal for this day, separately from completion.
+Arcs remain on the separate Goals page. No schedule, recurrence, parent, reward or Goal type
+changes when organizing Today.
 
-**All Tasks** defaults to **By time**: today's explicit times ascend chronologically,
-with an **Anytime** group after them. Equal times use creation timestamp, then stable ID.
-One-time times use the schedule model's local date anchor (or legacy creation date); other
-one-time dates and manually selected off-day recurrences are Anytime today. Titles never
-supply inferred times. Hovering the time label exposes the original schedule.
-**My order** uses accessible up/down buttons with focus retention and a live position
-announcement. It preserves schedules and completion, keeps hidden/nested IDs for restoration,
-and appends newly included IDs deterministically. Switching to By time or the split view
-preserves the saved sequence.
+`journeySections()` derives three disjoint top-level sections from the existing `journeyGoals()`:
+- **Today's Focus**: incomplete roots explicitly present in today's `focusIds`.
+- **Other Tasks**: all other incomplete roots, including automatic habits and newly created goals.
+- **Completed**: planned, non-hidden roots whose existing `completedDay` matches today.
 
-In **Journey & Routine**, explicitly selected/created top-level goals appear in Journey;
-automatic recurring goals appear in Routine. A goal selected both ways appears only in
-Journey. Both sections use chronological/Anytime grouping. Existing Quest nesting takes
-precedence: a selected child remains beneath its visible parent, never duplicated.
-Steps use compact flexible rows; collapsed Quests keep the child toggle and Add Step inline.
-Long titles/descriptions wrap; completed parents never dim active children. The sidebar,
-Goals dashboard and Skill trees keep their existing presentation. Switch controls respect
-reduced motion.
+The bookmark on an incomplete root toggles its destination; the existing searchable picker
+has Other Tasks / Today's Focus destinations and supports moving already included goals.
+New Goal creation continues to use the ordinary Step/Quest dialog and atomically selects the
+new ID, always without Focus. Save failure rolls back both selection and Focus. Completing
+and undoing use unchanged `toggleGoalCompletion()`, preserving exact recorded reward reversal.
+Completion never removes `focusIds` or `orderIds`; undo restores section and chosen position.
+The Completed section retains row metadata, shared actions, ×, and Quest child controls.
 
-Optional `state.journey = { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [],
-orderIds: [], viewMode: "all" | "split", sortMode: "time" | "manual" }` travels
-in the ordinary `neonGoalTracker.v1` write and Firestore mirror. IDs reference Goals;
-there is no second completion or XP state. Normalization adds the field to old documents,
-removes duplicate/deleted/Arc IDs, tolerates malformed optional fields, and clears both
-selection/removal lists and manual order on a different local date, retaining view/sort
-preferences. Missing/invalid preferences default to All Tasks / By time. Maintenance does not bump `updatedAt`. Existing day,
-resume, storage and cloud refresh paths update the view without changing historical facts.
+Hierarchy is resolved before section partitioning. Eligible direct Steps remain nested inside
+their visible Quest, including completed children; no duplicate top-level Completed row is made.
+The Quest's explicit Focus controls the whole group's location. Children have no separate
+bookmark while nested. Choosing a nested Step through the picker explicitly moves its visible
+Quest group, explained before selection; it does not infer priority from the child's existing
+Focus. A previously independent child's Focus is retained but dormant while nested. If its
+parent is hidden/absent, independently selected/due children can appear as roots again.
+Completing a parent does not complete children, or vice versa. Child counters/Add Step remain.
 
-Every row's × (including nested Steps) hides it for today only, including recurring goals. It changes
-neither the Goal nor its reminders. The searchable existing-goal picker restores hidden
-goals. Creation uses the ordinary Goal dialog limited to Step/Quest and atomically selects
-the new ID on save; Quest cards offer Add Step with the parent preselected. Cancellation
-never writes a selection. Skill creation remains in the shared Skills panel.
+Each section heading is a native button with count, chevron, `aria-expanded` and `aria-controls`.
+Session-only `collapsedJourneySections` defaults to Focus/Other expanded, Completed collapsed;
+it survives rerender, view switching and storage/cloud refresh without persistence writes.
+No collapse animation is required. Collapsing does not change calculations or membership.
+Completing into a collapsed section moves keyboard focus to its header.
+
+By time applies relevant local schedule times within each active section, followed by Anytime;
+equal times use creation timestamp then stable ID. My order supplies accessible up/down controls
+within the current incomplete section, with focus restoration and a live position announcement.
+Its single daily order list keeps hidden, nested and completed IDs so undo/restoration remains
+predictable; moving a goal to another section uses its saved position there, or time fallback
+if no order was stored. The section boundary cannot be crossed with reorder arrows.
+
+Optional `state.journey = { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [], orderIds: [],
+focusIds: [], viewMode: "all" | "split", sortMode: "time" | "manual" }` uses the ordinary
+`neonGoalTracker.v1` write and single Firestore mirror. Legacy `viewMode` is retained but ignored
+by rendering. No derived memberships are stored. Normalization is idempotent, defaults missing
+Focus to empty, removes duplicate/deleted/Arc IDs, tolerates malformed optional arrays, and clears
+all four daily ID lists on a different local date. Sort preference remains. Existing maintenance,
+resume, storage and cloud paths handle rollover without changing history or bumping `updatedAt`.
+
+`journeySummary()` retains hidden completed-today roots in completed/total counts, with the same
+Quest deduplication. Hidden unfinished goals are excluded; undo elsewhere removes their retained
+completion. Older/undated completions are not counted as today or fabricated into history. The
+picker labels older completions and disables their selection; existing Goals actions remain
+available on the separate Goals page. Forecast retains its original roots/children membership
+and formulas, including Other Tasks and children of completed Quests, independently of sections.
 
 ## Journey Forecast
 
