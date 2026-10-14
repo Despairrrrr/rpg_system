@@ -2407,25 +2407,7 @@ function renderJourney() {
   document.querySelectorAll('[data-journey-sort]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.journeySort === journey.sortMode)));
   document.getElementById('journeyOrderHint').hidden = !manual;
   list.replaceChildren();
-  const { done, total } = journeySummary(state.goals, journey, now);
   document.getElementById('journeyDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  const summary = document.getElementById('journeySummary');
-  const suffix = ` completed${total && done === total ? ' · All done for today' : ''}`;
-  if (summary.textContent !== `${done} of ${total}${suffix}`) {
-    summary.replaceChildren(journeyElement('strong', '', String(done)), document.createTextNode(' of '),
-      journeyElement('strong', '', String(total)), document.createTextNode(suffix));
-  }
-  const progress = document.getElementById('journeyProgress');
-  progress.max = total || 1;
-  progress.value = done;
-  const fill = document.getElementById('journeyProgressFill');
-  const width = `${total ? done / total * 100 : 0}%`;
-  if (fill.style.width !== width) fill.style.width = width;
-  // Paint initial/reloaded progress in place; animate only subsequent changes.
-  if (!fill.dataset.initialized) {
-    fill.dataset.initialized = 'true';
-    requestAnimationFrame(() => requestAnimationFrame(() => fill.classList.add('is-ready')));
-  }
   let empty = null;
   if (!goals.length) {
     empty = journeyElement('div', 'journey-empty panel');

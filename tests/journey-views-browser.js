@@ -67,7 +67,7 @@
     choose('Evening exercise','focus'); assert(where('evening')==='focus','picker moves already included goal to Focus');
     choose('Plan tomorrow'); assert(where('any')==='other','picker defaults Other');
     assert(facts()===before,'section changes preserve Goal, XP, Skill, schedule, parent and history');
-    const summary=document.getElementById('journeySummary').textContent;
+    const summary=JSON.stringify(journeySummary(state.goals,state.journey));
     const forecast=JSON.stringify(JourneyForecast.workload(journeyForecastGoals(state.goals,state.journey)));
     const stored=localStorage.getItem(STORAGE_KEY);
     for (const key of ['focus','other','completed']) {
@@ -78,7 +78,7 @@
     document.querySelector('[data-section="goals"]').click(); document.querySelector('[data-section="journey"]').click();
     assert(toggle('focus').getAttribute('aria-expanded')==='false' && toggle('other').getAttribute('aria-expanded')==='false' && toggle('completed').getAttribute('aria-expanded')==='true','independent collapse survives navigation');
     assert(stored===localStorage.getItem(STORAGE_KEY) && facts()===before,'collapse causes no persistence or fact changes');
-    assert(document.getElementById('journeySummary').textContent===summary && JSON.stringify(JourneyForecast.workload(journeyForecastGoals(state.goals,state.journey)))===forecast,'all sections remain counted in progress and Forecast');
+    assert(JSON.stringify(journeySummary(state.goals,state.journey))===summary && JSON.stringify(JourneyForecast.workload(journeyForecastGoals(state.goals,state.journey)))===forecast,'all sections remain counted in progress and Forecast');
     toggle('focus').click();toggle('other').click();toggle('completed').click();
     focus('once'); sort('manual');
     assert(ids('focus')==='once,evening','initial manual Focus order is chronological');
@@ -96,9 +96,9 @@
     check('morning-a').click(); assert(ids('other')===otherOrder && state.skills[0].xp===0,'undo returns Other order');
     sort('time'); assert(ids('focus')==='once,evening','By time inside Focus');
     sort('manual'); assert(ids('focus')===order,'manual order survives sort switch');
-    check('evening').click(); const doneSummary=document.getElementById('journeySummary').textContent;
+    check('evening').click(); const doneSummary=JSON.stringify(journeySummary(state.goals,state.journey));
     card('evening').querySelector('.journey-remove').click();toggle('completed').click();toggle('completed').click();
-    assert(!card('evening') && document.getElementById('journeySummary').textContent===doneSummary,'hidden completion stays hidden and counted');
+    assert(!card('evening') && JSON.stringify(journeySummary(state.goals,state.journey))===doneSummary,'hidden completion stays hidden and counted');
     choose('Evening exercise','focus'); check('evening').click();
     assert(ids('focus')===order && state.skills[0].xp===0,'restore hidden Focus and undo retains original order');
     card('quest').querySelector('[data-journey-expand]').click();

@@ -109,11 +109,8 @@ children, independently of collapse/sort; Other Tasks no longer contribute. Its 
 
 ## Journey Forecast
 
-The header uses Georgia/serif for the date (14px) and counter (15px, tabular numerals with
-emphasized counts). The existing native progress retains its completed/total semantics; a stable
-visual sibling draws an 8px antique-gold gradient (#8C6425 → #B8842F → #D6A85A) on beige #D8C5A0.
-Its desktop track is 65% wide, capped at 700px, and 100% at ≤720px. Only changed values animate
-for 300ms; initial/reloaded values paint in place and reduced motion disables transitions.
+The header uses Georgia/serif for the date (14px). The completed/total counter and its progress
+bar were removed; the date is followed directly by By time / My order.
 
 The 48px collapsed native disclosure now follows By time / My order and sits 12px above the
 Journey list. It shows a chevron, title, optional 14px status circle and active target time.

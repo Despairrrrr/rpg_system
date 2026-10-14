@@ -1969,15 +1969,6 @@ button:disabled { cursor: default; opacity: .4; }
 #journeyPage .section-head { gap: 12px; flex-wrap: wrap; }
 #journeyPage h1 { text-transform: none; }
 #journeyDate { margin: 10px 0 0; font: 14px/1.5 Georgia, 'Times New Roman', serif; color: var(--ink-soft); }
-#journeySummary { margin: 8px 0; font: 15px/1.5 Georgia, 'Times New Roman', serif; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-#journeySummary strong { font-weight: 700; color: var(--ink); }
-.journey-progress-track { position: relative; width: 65%; max-width: 700px; height: 8px; margin: 0 0 18px; overflow: hidden; border-radius: 4px; background: #D8C5A0; box-shadow: inset 0 1px 1px #8C64251A; }
-/* Native progress supplies semantics; its stable sibling supplies consistent animation. */
-#journeyProgress { position: absolute; inset: 0; width: 100%; height: 8px; margin: 0; opacity: 0; }
-#journeyProgressFill { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8C6425, #B8842F 45%, #D6A85A); }
-#journeyProgressFill.is-ready { transition: width 300ms ease-out; }
-@media (max-width: 720px) { .journey-progress-track { width: 100%; } }
-@media (prefers-reduced-motion: reduce) { #journeyProgressFill.is-ready { transition: none; } }
 #journeyList { display: grid; gap: 22px; }
 #journeyPage { max-width: 1040px; width: 100%; }
 .journey-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 0 0 18px; }

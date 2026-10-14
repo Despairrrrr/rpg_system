@@ -65,9 +65,8 @@ See [AGENTS.md](AGENTS.md) and the [current interface contract](CRUD.md#current-
 Start with today's scheduled Steps and Quests, or use **+ Add a Goal** to select an
 existing goal or create one. Expand Quests to complete their child Steps. The × hides
 any goal, including a nested Step, for today; add it again through the picker whenever plans change.
-Hiding a completed Goal keeps it in today’s completed/total summary and progress bar.
-Hiding an unfinished Goal removes it from the total. Undo elsewhere removes a hidden
-completion from the summary; restoring it never counts it twice.
+Hiding a completed Goal keeps its completion and reward. Hiding an unfinished Goal removes it
+from today's plan. Undo elsewhere removes a hidden completion; restoring it never counts it twice.
 Today's plan has three independently collapsible sections: **Today's Focus**, **Other Tasks**,
 and **Completed**. Focus is an explicit choice for this local day only: use the bookmark
 on an incomplete card or choose **Today's Focus** in the existing-goal picker. The picker
@@ -120,9 +119,7 @@ Green means Good outlook, yellow At risk, red High risk; expiry is explained as 
 
 Updates reuse the existing minute/resume lifecycle and happen after Focus changes, completion,
 undo, time edits and relevant Goal changes. Calculation never writes state or changes XP/history.
-The 8px daily progress bar still counts the whole daily plan: 65% width (max 700px) on desktop,
-full width on mobile, antique-gold fill and a 300ms transition disabled under reduced motion.
-Dates and counts use the existing editorial font family. See [implementation details](CRUD.md#journey-forecast).
+Dates use the existing editorial font family. See [implementation details](CRUD.md#journey-forecast).
 
 ## Run
 

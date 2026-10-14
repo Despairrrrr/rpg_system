@@ -1,7 +1,7 @@
 # Goal Tracker — полный контекст для передачи другой модели (GPT)
 
 Всё ниже написано **по коду** (app.js, страницы, модули, стили, тесты), а не по AGENTS.md/README.md.
-Контекст сверен с реализацией на 15 октября 2026: Focus / Other Tasks / Completed, компактный fantasy journal, Journey Forecast и скрытые завершения в сводке Today.
+Контекст сверен с реализацией на 15 октября 2026: Focus / Other Tasks / Completed, компактный fantasy journal, Journey Forecast и скрытые завершения Today.
 Life History / Chronicles были отменены: их раздела, модулей и полей в текущей реализации нет.
 Скопируй этот файл целиком в модель как контекст перед задачей.
 
@@ -276,12 +276,9 @@ state = {
 
 ## Journey Forecast
 
-Порядок шапки: заголовок → дата → счётчик → прогресс → By time / My order → Forecast → Focus.
-Дата (14px) и счётчик (15px, tabular numerals) используют Georgia/serif; главный заголовок не менялся.
-Прогресс 8px, desktop 65% ширины/max 700px, mobile ≤720px — 100%; трек #D8C5A0,
-градиент #8C6425 → #B8842F → #D6A85A. Native `#journeyProgress` сохраняет доступность/value/max,
-а постоянный `#journeyProgressFill` плавно меняет width за 300ms только при изменении значения.
-Первый показ/reload не анимируется; reduced motion отключает переход. Счётчик по-прежнему считает весь Today.
+Порядок шапки: заголовок → дата → By time / My order → Forecast → Focus.
+Дата (14px) использует Georgia/serif; главный заголовок не менялся. Счётчик выполненных и
+прогресс-бар Today удалены из UI; `journeySummary()` остаётся моделью скрытых завершений.
 
 Forecast — нативный details со свёрнутой высотой 48px, отступом до списка 12px, без sticky.
 В summary — шеврон, название, необязательный цветной круг 14px и активное время. Процент,
@@ -458,8 +455,7 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
     Empty Focus, inactive, unavailable and completed work have no circle; expiry is red.
     Reuse the single reminder timer/resume hooks and stable DOM, preserving drafts and focus.
     Settings use normal save/sync/rollback; calculation never writes. Keep XP/history untouched.
-    Daily progress still counts all planned roots: 8px, 65%/max700px desktop, 100% mobile,
-    saturated gold, 300ms changes only, reduced motion respected; editorial date/counter.
+    Today has no visible completed/total counter or progress bar; editorial date only.
 
 CONSTRAINTS:
 - Vanilla JS only. Globals and load order matter: firebase compat → firebase.init →

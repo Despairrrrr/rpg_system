@@ -43,7 +43,7 @@ function createJourneyForecastView({ getState, getPlan, update, updatePreference
     text('forecastStatus', status);
     text('forecastTarget', settings.activeDate ? settings.preferredEndTime : 'Set target');
     $('forecastTarget').title = settings.activeDate ? `Today's target: ${settings.preferredEndTime}` : `Remembered time: ${settings.preferredEndTime} · Not active today`;
-    text('forecastDetails', phase === 'active' ? `${status} — for your remaining Focus goals.` : {
+    text('forecastDetails', phase === 'active' ? '' : {
       empty: 'Choose goals for Today’s Focus to see an outlook.',
       inactive: 'Change the time or use your remembered target today to see a Focus outlook.',
       completed: 'Your Focus work is complete. Undo or add a Focus goal to update the outlook.',

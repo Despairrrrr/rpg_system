@@ -29,7 +29,7 @@
       $('forecastShowIndicator').click();await togglePanel();
       window.scrollTo(0,0);await wait(350);
       assert(!__browserErrors.length,'no errors after reload');
-      result.textContent='PASS: compact Forecast, Focus-only automatic outlook, all risks, explicit target activation, no-focus/completed/expiry, progress dimensions/animation/undo, clock/resume, UI preferences, real reload, day reset, sync, rollback and reduced motion';
+      result.textContent='PASS: compact Forecast, Focus-only automatic outlook, all risks, explicit target activation, no-focus/completed/expiry, completion/undo, clock/resume, UI preferences, real reload, day reset, sync, rollback and reduced motion';
       document.body.append(result);return;
     }
     state=migrateState({updatedAt:19,profile:{name:'Wayfarer'},streak:{count:0,date:''},skills:[{id:'math',name:'Learning',xp:0}],goals:[1,2,3,4].map(n=>({id:`s${n}`,type:'step',title:['Read a chapter','Practice vocabulary','Write a reflection','Review notes'][n-1],description:'',skillId:'math',parentGoalId:'',xp:125,schedule:{type:'daily'},completed:false,createdAt:new Date().toISOString()}))});
@@ -53,12 +53,7 @@
       assert(panel.closest('.forecast-panel').nextElementSibling===$('journeyList'),'Forecast immediately precedes sections');
       const height=panel.closest('.forecast-panel').getBoundingClientRect().height;
       assert(height>=44 && height<=52,'collapsed panel is 44–52px');
-      const track=document.querySelector('.journey-progress-track'), fill=$('journeyProgressFill');
-      const width=track.getBoundingClientRect().width, available=$('journeyPage').getBoundingClientRect().width;
-      assert(track.getBoundingClientRect().height===8 && width<=700,'8px progress, capped width');
-      assert(innerWidth>720 ? width/available>=.6 && width/available<=.7 : width/available>.95,'desktop shortened and mobile full-width progress');
-      assert(fill.style.width==='0%' && $('journeyProgress').value===0,'zero progress');
-      assert(getComputedStyle($('journeyDate')).fontFamily.includes('Georgia') && getComputedStyle($('journeySummary')).fontVariantNumeric.includes('tabular'),'editorial date/counter typography');
+      assert(getComputedStyle($('journeyDate')).fontFamily.includes('Georgia'),'editorial date typography');
       await togglePanel();
       assert(panel.open && state.journeyForecast.expanded,'opening saved');
       time('16:00');
@@ -79,9 +74,8 @@
       advance(0,16);
       assert(number()===50 && writes===saved && state.updatedAt===timestamp,'clock updates without writes');
       assert(!panel.open && input===$('forecastEndTime') && summary===$('forecastSummary') && Math.abs($('journeyList').getBoundingClientRect().top-top)<1,'status changes preserve disclosure, DOM and layout');
-      check('s4').click();assert(number()===50 && $('journeyProgress').value===1,'Other completion changes progress but not forecast');
-      await wait(350);
-      assert(Math.abs(fill.getBoundingClientRect().width/track.getBoundingClientRect().width-.25)<.01,'partial progress reaches 25%');
+      check('s4').click();assert(number()===50 && journeySummary(state.goals,state.journey).done===1,'Other completion changes summary but not forecast');
+      assert(Math.abs(journeySummary(state.goals,state.journey).done/journeySummary(state.goals,state.journey).total-.25)<.01,'partial completion reaches 25%');
       check('s4').click();
       changeJourneySelection('s3',true,false);assert(number()>50,'removing Focus immediately reduces work');
       changeJourneySelection('s3',true,true);assert(number()===50,'adding Focus restores work');
@@ -93,11 +87,10 @@
       updateGoal('s3',{xp:10});assert(number()>50,'Goal data edits update outlook');updateGoal('s3',{xp:125});
       for(const goal of state.goals)toggleGoalCompletion(goal.id,true);
       assert(panel.dataset.phase==='completed' && $('forecastIndicator').hidden && $('forecastStatus').textContent==='Focus complete','all Focus done is explicit completed state, no fake probability');
-      await wait(350);
-      assert($('journeyProgress').value===$('journeyProgress').max && fill.style.width==='100%' && Math.abs(fill.getBoundingClientRect().width-track.getBoundingClientRect().width)<1,'100% completion fills entire track');
-      renderJourney();assert(!fill.getAnimations().length,'identical rerender does not replay fill animation');
+      const complete=journeySummary(state.goals,state.journey);
+      assert(complete.total>0 && complete.done===complete.total,'completed summary counts every recorded goal');
       for(const goal of state.goals)toggleGoalCompletion(goal.id,false);
-      await wait(350);assert(fill.getBoundingClientRect().width===0 && number()===50,'undo returns zero progress and prior forecast');
+      await wait(350);assert(journeySummary(state.goals,state.journey).done===0 && number()===50,'undo returns zero completion and prior forecast');
       const savedExpiry=writes;advance(0,17);
       assert(panel.dataset.phase==='expired' && panel.dataset.risk==='high-risk' && !panel.open && state.journeyForecast.preferredEndTime==='17:00','expiry is red without extending time or expanding panel');
       reminderSystem.refresh();assert(writes===savedExpiry,'expiry never writes');
@@ -124,8 +117,8 @@
       Storage.prototype.setItem=countingSet;time('21:30');assert(!$('forecastError').textContent,'retry succeeds');
       $('forecastUseToday').click();assert(!state.journeyForecast.activeDate && panel.dataset.phase==='inactive','explicit deactivation remains available');
       if(matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        assert(getComputedStyle(fill).transitionDuration==='0s' && getComputedStyle(summary,'::before').transitionDuration==='0s','reduced motion disables progress and disclosure transitions');
-      } else assert(getComputedStyle(fill).transitionDuration==='0.3s','progress uses 300ms transition');
+        assert(getComputedStyle(summary,'::before').transitionDuration==='0s','reduced motion disables disclosure transitions');
+      }
       // Restore actual local date so a real reload exercises same-day persisted activation.
       advance(0,15);
       for(const id of ['s1','s2','s3'])changeJourneySelection(id,true,true);
