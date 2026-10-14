@@ -2295,10 +2295,37 @@ body { transition: background-color var(--motion-view) ease-out; }
   .view-entering { animation: none; }
 }
 
-/* Today's sections retain the parchment surfaces and existing card hierarchy. */
-.journey-section-toggle { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 6px 8px; border: 0; border-bottom: 1px solid var(--border-soft); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.journey-section[data-journey-section="focus"] .journey-section-toggle { color: var(--accent-text); border-bottom-color: var(--gold); }
-.journey-section[data-journey-section="completed"] .journey-section-toggle { color: var(--muted); }
+/* Compact quest journal: local tokens keep priority separate from Goal type.
+   No styles below affect the Goals board, Skill tree or Forecast. */
+#journeyList {
+  --journey-step: #6D876E;
+  --journey-step-ink: #53765A;
+  --journey-step-surface: #EEF0DF;
+  --journey-step-border: #B5C0A5;
+  --journey-quest: #B27A3E;
+  --journey-quest-ink: #996329;
+  --journey-quest-surface: #F4E7CE;
+  --journey-quest-border: #C9AB77;
+  --journey-focus: #B58A3D;
+  --journey-highlight: #D0AB69;
+  --journey-burgundy: #532F35;
+  --journey-ivory: #FFF4DE;
+  --journey-step-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m8 2 5 6-5 6-5-6Z' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
+  --journey-quest-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 3h8v9a2 2 0 0 1-4 0H2V5a2 2 0 0 1 4 0h8a2 2 0 0 0-2-2M5 7h5M5 9h4M2 12h10' fill='none' stroke='black' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --journey-bookmark-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 2h8v12l-4-3-4 3Z' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+.journey-section-toggle { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: color-mix(in srgb, var(--surface) 65%, var(--bg)); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.journey-section[data-journey-section="focus"] .journey-section-toggle {
+  color: var(--journey-ivory);
+  border-color: var(--journey-focus);
+  background: var(--journey-burgundy);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--journey-highlight) 45%, transparent);
+}
+.journey-section[data-journey-section="completed"] .journey-section-toggle {
+  color: var(--muted);
+  border-color: color-mix(in srgb, var(--journey-step-border) 60%, var(--border));
+  background: color-mix(in srgb, var(--journey-step-surface) 35%, var(--bg));
+}
 .journey-chevron { width: 12px; flex-shrink: 0; }
 .journey-section-body { display: grid; gap: 14px; min-width: 0; }
 .journey-section-body[hidden] { display: none; }
@@ -2307,3 +2334,105 @@ body { transition: background-color var(--motion-view) ease-out; }
 .journey-focus-toggle[aria-pressed="true"] { color: var(--accent-text); }
 .journey-focus-toggle[aria-pressed="true"] svg { fill: color-mix(in srgb, var(--gold) 25%, transparent); }
 .journey-focus-toggle:hover { background: color-mix(in srgb, var(--gold) 15%, transparent); }
+
+#journeyList .journey-section-toggle::before {
+  content: '';
+  order: -1;
+  flex: 0 0 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: var(--journey-step-icon) center / contain no-repeat;
+  mask: var(--journey-step-icon) center / contain no-repeat;
+}
+#journeyList [data-journey-section="focus"] .journey-section-toggle::before {
+  color: var(--journey-highlight);
+  -webkit-mask-image: var(--journey-bookmark-icon);
+  mask-image: var(--journey-bookmark-icon);
+}
+#journeyList [data-journey-section="completed"] .journey-section-toggle::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='black' stroke-width='1.8'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='black' stroke-width='1.8'/%3E%3C/svg%3E");
+}
+#journeyList .journey-chevron { order: -2; }
+#journeyList .journey-count {
+  margin-left: auto;
+  min-width: 25px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: inherit;
+  font: 500 12px/1.3 var(--font-ui);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+#journeyList .journey-section-toggle:hover { filter: brightness(.97); }
+#journeyList [data-journey-section="focus"] .journey-section-toggle:hover { filter: brightness(1.12); }
+#journeyList .journey-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font: italic 12px/1.5 var(--font-ui);
+  letter-spacing: .02em;
+}
+#journeyList .journey-group-title::after { content: ''; flex: 1; border-top: 1px solid var(--border-soft); }
+#journeyList .journey-card {
+  --journey-type: var(--journey-step);
+  --journey-type-ink: var(--journey-step-ink);
+  --journey-type-surface: var(--journey-step-surface);
+  --journey-type-border: var(--journey-step-border);
+  --journey-type-icon: var(--journey-step-icon);
+  border: 1px solid var(--journey-type-border);
+  border-left: 3px solid var(--journey-type);
+  background: color-mix(in srgb, var(--journey-type-surface) 65%, var(--surface));
+}
+#journeyList .journey-card.quest {
+  --journey-type: var(--journey-quest);
+  --journey-type-ink: var(--journey-quest-ink);
+  --journey-type-surface: var(--journey-quest-surface);
+  --journey-type-border: var(--journey-quest-border);
+  --journey-type-icon: var(--journey-quest-icon);
+}
+/* Two-pixel gold frame outranks either type's ordinary one-pixel frame. */
+#journeyList [data-journey-section="focus"] .journey-card {
+  border-width: 2px;
+  border-color: var(--journey-focus);
+  border-left: 3px solid var(--journey-type);
+  background: color-mix(in srgb, var(--journey-type-surface) 50%, var(--journey-ivory));
+  box-shadow: inset 0 1px 0 #fff7, 0 1px 3px #532f3514;
+}
+#journeyList .journey-card.is-completed {
+  background: color-mix(in srgb, var(--bg) 85%, var(--journey-type-surface));
+  border-color: color-mix(in srgb, var(--journey-step-border) 60%, var(--border));
+  border-left-color: color-mix(in srgb, var(--journey-type) 65%, var(--border));
+  box-shadow: none;
+}
+#journeyList .journey-content h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+#journeyList .quest > .journey-row > .journey-content > h3 { font-size: 15px; font-weight: 700; }
+#journeyList .journey-content h3::before {
+  content: '';
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  vertical-align: -2px;
+  background: var(--journey-type-ink);
+  -webkit-mask: var(--journey-type-icon) center / contain no-repeat;
+  mask: var(--journey-type-icon) center / contain no-repeat;
+}
+#journeyList .journey-children .journey-row {
+  --journey-type-ink: var(--journey-step-ink);
+  --journey-type-icon: var(--journey-step-icon);
+}
+#journeyList .journey-children { border-left-color: var(--journey-step-border); }
+#journeyList .journey-row.is-completed > .journey-content > .goal-metadata { opacity: 1; color: var(--muted); }
+#journeyList .journey-row.is-completed > .journey-content > h3 { text-decoration-color: var(--journey-step); }
+#journeyList .journey-row.is-completed > .journey-content > h3::before { opacity: .75; }
+#journeyList .goal-check input:checked + span { background: var(--journey-step-ink); border-color: var(--journey-step-ink); }
+#journeyList .goal-check input:checked + span::after { border-color: var(--journey-ivory); }
+#journeyList button:focus-visible, #journeyList a:focus-visible { outline-color: var(--journey-burgundy); }

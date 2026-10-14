@@ -1,7 +1,7 @@
 # Goal Tracker — полный контекст для передачи другой модели (GPT)
 
 Всё ниже написано **по коду** (app.js, страницы, модули, стили, тесты), а не по AGENTS.md/README.md.
-Контекст сверен с текущей реализацией, включая Journey Forecast и сохранение скрытых выполненных целей в сводке Today.
+Контекст сверен с реализацией на 14 октября 2026: Focus / Other Tasks / Completed, компактный fantasy journal, Journey Forecast и скрытые завершения в сводке Today.
 Life History / Chronicles были отменены: их раздела, модулей и полей в текущей реализации нет.
 Скопируй этот файл целиком в модель как контекст перед задачей.
 
@@ -32,8 +32,8 @@ schedule-model.js?v=4            — глобальный GoalSchedule
 journey-forecast-model.js?v=1    — глобальный JourneyForecast: чистые расчёты и нормализация
 journey-forecast.js?v=1          — createJourneyForecastView; null без #journeyForecast
 reminders.js?v=2                 — createReminderPanel, createReminderSystem, createBrowserReminders
-app.js?v=22                      — всё приложение
-styles.css?v=20                  — на всех трёх страницах
+app.js?v=24                      — всё приложение
+styles.css?v=24                  — на всех трёх страницах
 ```
 
 `login.html` грузит только firebase-app + firebase-auth + firebase.init + `login.js?v=2` (без Firestore).
@@ -68,6 +68,7 @@ STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-brow
 STATISTICS_TEST_SCRIPT=journey-forecast-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
 GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=journey-forecast-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-polish-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=statistics-stacks-browser.js python3 tests/statistics-browser.py webkit
 ```
@@ -102,7 +103,7 @@ state = {
   completionHistory: [...],
   statisticsStartedOn: "YYYY-MM-DD",
   schemaVersion: 3,                  // добавляется миграцией
-  journey: { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [], orderIds: [],
+  journey: { date: "YYYY-MM-DD", selectedIds: [], hiddenIds: [], orderIds: [], focusIds: [],
              viewMode: "all"|"split", sortMode: "time"|"manual" },
   journeyForecast: { preferredEndTime: "21:00", activeDate: "" }, // activeDate = текущий локальный день после Calculate
   oneTimeSchedules?: { [goalId]: { day: "YYYY-MM-DD", configuredAt: ms } },
@@ -216,29 +217,45 @@ state = {
    Missed не создаёт фиктивную историю; отказ уведомлений не ломает in-app напоминания.
 8. Секция профиля: стрик-бейдж с 5 тирами (SVG из `assets/streak-tier-*.svg`), уровень и
    XP-бар; анимации на CSS-переменных `--motion-*` с reduced-motion фолбэками.
-9. Дизайн: тёмная неоновая тема (фон `#061a2d→#03111e`, `--blue #20b9ff`, `--green #1df4a1`,
-   `--orange`, красный `--ff4f4f`), Inter, радиус 16px; цвета ролей — step циан `#27d9d0`,
-   quest фиолет `#7c6cff`, arc оранжевый; колонки/узлы дерева с structural accent borders,
-   выполненные карточки — тише, но не затемняют активных детей; XP — вторичный текст.
-   Брейкпоинты 1180/1100/850/720/480px (на 720px доска в колонку, поиск скрыт).
+9. Дизайн: тёплый пергамент Journey/Goals (`--bg #E8DCC0`, `--surface #F2EAD2`),
+   Midnight Archive для профиля/Skills, skill.html и Statistics. MedievalSharp — для заголовков;
+   системный UI-шрифт — для кнопок/метаданных, Georgia/serif — для названий целей только в Today.
+   В Today Step — sage с ромбом, Quest — bronze со свитком, левая полоса 3px; Focus сильнее типа:
+   бордовый заголовок, ivory-текст и рамка gold 2px на карточках против 1px в Other Tasks.
+   Completed приглушён, без opacity всей карточки; активные дети не затемняются. Заголовки 44px,
+   размеры/отступы списков сохранены; CSS-значки неинтерактивны, внешних ресурсов нет.
+   Стиль ограничен Journey. На Goals/Skill сохраняются structural accent borders и существующие
+   макеты; XP вторичен. Анимация навигации 220ms, `prefers-reduced-motion` её отключает.
 10. Модалки — нативные `<dialog>.showModal()`; удаления — браузерные `confirm()`;
     гарды — `alert()`. Это текущая конвенция.
 
 ## Today’s Journey и Pause/Resume
 
-- `renderJourney()` / `journeySections()` показывают Step/Quest в All Tasks (по умолчанию)
-  либо Journey & Routine. Автоматически включаются только эффективно активные повторяющиеся
-  Goals на сегодня; ручной выбор включает и paused/one-time Goals. Прямые дочерние Steps
-  раскрываются под видимым Quest и не дублируются; paused-ребёнок требует ручного выбора.
-- By time сортирует по времени, относящемуся к сегодняшнему дню, затем `createdAt` и ID;
-  без времени — Anytime. My order в All Tasks использует доступные кнопки вверх/вниз и
-  `orderIds`. Split-view сортируется по времени. Завершение не переставляет строки.
-- × скрывает Goal только на сегодня; picker может вернуть его. `journeySummary()` сохраняет
-  скрытые выполненные Goals в completed/total, исключает скрытые невыполненные и не считает
-  дочерние Steps повторно вместе с Quest. Undo убирает скрытое завершение из сводки;
-  возврат через picker не дублирует счётчик. Ручные selected/hidden/order
-  очищаются при смене локального дня; `viewMode` / `sortMode` сохраняются. Новые Goals
-  из Today создаются обычным CRUD и одновременно выбираются на сегодня.
+- `renderJourney()` / `journeySections()` показывают три непересекающихся секции:
+  Today's Focus (незавершённые, явно выбранные в `focusIds`), Other Tasks (остальные незавершённые),
+  Completed (выполненные с `completedDay` сегодняшнего дня). Старый `viewMode` хранится для
+  совместимости, но не влияет на UI. Повторяющиеся effectively active Goals включаются по расписанию;
+  ручной выбор включает и paused/one-time Goals. Никаких автоматических приоритетов.
+- Bookmark на карточке и destination в существующем picker меняют Focus. Новые Goals из Today
+  создаются обычным CRUD, выбираются на сегодня и по умолчанию попадают в Other Tasks.
+  Завершение переносит root в Completed, сохраняя `focusIds`/`orderIds`; undo возвращает его обратно
+  через обычный механизм XP/history. Старые/недатированные завершения не считаются сегодняшними.
+- Дочерние Steps остаются под видимым Quest, включая завершённых детей, без дублирования в Completed.
+  Место группы задаёт Focus самого Quest; Focus ребёнка не делает родителя приоритетным автоматически.
+  Picker заранее поясняет, что выбор destination вложенного Step перемещает видимую группу Quest.
+  Когда родитель скрыт, независимо выбранный/запланированный Step снова может стать root.
+  Завершение родителя не завершает детей и наоборот. Paused-ребёнок требует ручного выбора.
+- By time сортирует внутри каждой активной секции по актуальному времени, затем `createdAt`/ID;
+  без времени — Anytime. My order использует `orderIds` и кнопки вверх/вниз только внутри секции;
+  скрытые/вложенные/выполненные IDs сохраняют позицию для восстановления.
+- Каждая секция имеет button с chevron, count, `aria-expanded`/`aria-controls`. Объект
+  `collapsedJourneySections` живёт только в памяти: Focus/Other раскрыты, Completed свёрнут.
+  Переключение вкладок/рендер сохраняет раскрытие, reload возвращает defaults; записей в storage нет.
+- × скрывает Goal только на сегодня. `journeySummary()` сохраняет скрытые выполненные сегодня Goals
+  в completed/total, исключает скрытые невыполненные и не считает ребёнка повторно с Quest.
+  Undo убирает скрытое завершение из сводки; picker возвращает Goal без дубликата.
+  `normalizeJourney()` очищает selected/hidden/order/focus при смене локального дня, сохраняет sort;
+  idempotent-нормализация отбрасывает дубли/удалённые/Arc IDs. Focus использует обычный save/rollback/sync.
 - `GoalSchedule.isEffectivelyActive()` учитывает всю цепочку родителей, не меняя статус
   детей. `setGoalStatus()` использует обычный save/rollback/sync; пауза не меняет XP,
   историю, настройки расписания или возможность ручного завершения.
@@ -259,7 +276,8 @@ state = {
 
 ## Journey Forecast
 
-Компактная панель находится под прогрессом Today, перед переключателем All Tasks / Journey & Routine.
+Компактная панель находится под прогрессом Today, перед By time / My order. Focus и раскрытие секций
+не меняют Forecast: учитываются все оставшиеся цели плана, включая Other Tasks.
 Это приблизительная игровая оценка реалистичности плана, а не статистически проверенная вероятность.
 Нативное поле времени изначально показывает 21:00. Изменение поля запоминает предпочтение;
 Calculate активирует прогноз только для времени позже текущего и сворачивает панель.
@@ -347,7 +365,7 @@ sign-in, open-redirect guard), app.js (state, CRUD, rendering, sync, auth, FX),
 statistics-model.js (global `Statistics`), statistics.js (createStatisticsView({getState, save})),
 schedule-model.js (global `GoalSchedule`), journey-forecast-model.js (global `JourneyForecast`),
 journey-forecast.js (createJourneyForecastView), reminders.js (createReminderPanel,
-createReminderSystem, createBrowserReminders), styles.css (dark neon theme, --motion-* tokens),
+createReminderSystem, createBrowserReminders), styles.css (parchment / Midnight Archive theme, --motion-* tokens),
 firebase.init.js, tests/ (gjs/node model tests that eval the DOM-free `// <goal-model>` block
 from app.js, plus isolated browser tests). Scripts load in a fixed order with ?v=N cache tokens
 identical on index.html and skill.html.
@@ -363,7 +381,7 @@ DATA MODEL:
 - completionHistory: {id, goalId, skillId, goalType?, completionDate, xpAwarded, occurrenceKey?}
 - profile: {name, photo (centre-cropped 256×256 JPEG data URL ≤150 KB, read only via
   readProfilePhoto(), never injected via innerHTML)}
-- journey: {date, selectedIds, hiddenIds, orderIds, viewMode: all|split, sortMode: time|manual}
+- journey: {date, selectedIds, hiddenIds, orderIds, focusIds, viewMode: all|split, sortMode: time|manual}
 - journeyForecast: {preferredEndTime: "HH:MM", activeDate: "YYYY-MM-DD" | ""}; no stored percentage/status
 - optional: oneTimeSchedules {goalId:{day, configuredAt}}, reminderReceipts {goalId:{key,status}}
 - player XP = sum of skill XP (derived, never stored); level = floor(sqrt(xp/100))+1,
@@ -410,24 +428,32 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
 10. Migration is idempotent and must keep existing data (legacy goal types daily/short/medium/
     long → step/quest/arc; repeatsDaily:true + no schedule → {type:"daily"}). `updatedAt`
     increases strictly on user saves but maintenance saves must not bump it.
-11. Visual language: dark neon theme, Inter font, per-role accent colors, structural accent
-    borders on goal columns/tree items, completed cards quieter without dimming active children,
-    animation tokens --motion-* with reduced-motion fallbacks. Keep ?v=N cache-bust tokens
-    consistent across index.html and skill.html when you change a shared asset.
+11. Visual language: warm parchment for Journey/Goals; Midnight Archive for profile/Skills,
+    Skill detail and Statistics. MedievalSharp headings, system UI controls/metadata, Georgia/serif
+    Today goal titles (14px Step, 15px Quest). Journey-only sage/diamond Steps and bronze/scroll
+    Quests use 3px left accents. Focus outranks type: burgundy/ivory header, 2px gold card frame;
+    Other uses 1px type frames; Completed is subdued without dimming active children. Keep compact
+    dimensions, structural Goal/Skill accents, motion tokens and reduced-motion fallbacks.
+    Bump shared cache versions consistently across pages. CSS icons are non-interactive.
 
-12. Today's Journey has All Tasks and Journey & Routine views. Include scheduled effectively
-    active Step/Quest Goals automatically, or manually selected Goals regardless of pause.
-    Nested Steps remain beneath their visible Quest. By time uses today's relevant schedule;
-    My order in All Tasks uses accessible reorder buttons. Completion keeps rows in place.
-    The date-scoped × removes a Goal for today. On a new day clear selections/removals/order,
-    retaining view/sort preferences. Creation/undo use normal Goal CRUD and rewards.
+12. Today's Journey has independently collapsible Focus / Other Tasks / Completed sections.
+    Only explicit daily focusIds create priority; habits, ordinary selections and new goals default
+    to Other. Existing picker selects a destination; bookmarks move incomplete roots between sections.
+    Nested Steps stay with their visible Quest, including completed children, without duplication.
+    Picker explains when selecting a nested Step moves its visible Quest group; never infer parent
+    priority from child Focus. Completion moves roots completed today to Completed; normal undo
+    restores section/order and reverses recorded XP. No fabricated completion dates or history.
+    By time and My order operate within each active section. Date-scoped × hides without erasing
+    today's completed summary contribution. Clear selected/hidden/order/focus IDs on local rollover;
+    retain sort. Legacy viewMode is ignored. Disclosure state is session-only, without saves:
+    Focus/Other expanded and Completed collapsed on reload. Use existing save/rollback/cloud paths.
 13. Own status is active|paused; ancestor pausing is dynamic and never rewrites child statuses.
     Today and reminders share GoalSchedule.isEffectivelyActive(). Effective resume (including
     hierarchy edits) suppresses reminders due before remindersResumeAt, preserving schedules.
 14. Life History/Chronicles is not part of this checked-out implementation. Its modules and
     chronicle snapshots are absent; adding them would be a separate product change.
 
-15. Journey Forecast stays below Today's progress and above the view switch. Preserve native time,
+15. Journey Forecast stays below Today's progress and above the sort controls. All remaining planned work, including Other Tasks, counts regardless of collapse or Focus. Preserve native time,
     disclosure/keyboard focus, collapsed percentage and risk label, immediate active target edits,
     explicit activation each local day and explicit restart after expiry. Keep preferredEndTime
     across days; derive expiry/completed state without minute writes. Never extend deadlines or

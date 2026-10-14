@@ -77,6 +77,14 @@ it survives rerender, view switching and storage/cloud refresh without persisten
 No collapse animation is required. Collapsing does not change calculations or membership.
 Completing into a collapsed section moves keyboard focus to its header.
 
+Journey styling is scoped to `#journeyList`: Step uses sage, a diamond and a 3px left stripe;
+Quest uses bronze, a scroll and the same compact geometry. Focus takes precedence over type,
+with a burgundy/ivory 44px header and a 2px gold card border; Other keeps a 1px type border.
+Completed retains readable metadata and a visible sage check without whole-card opacity.
+Nested Steps retain their own sage icon inside Quests. Goal titles use Georgia/serif at 14/15px;
+metadata stays in the system UI font. CSS masks add no interactive controls or external assets.
+Header counts align right and Scheduled/Anytime retain their grouping with fine divider lines.
+
 By time applies relevant local schedule times within each active section, followed by Anytime;
 equal times use creation timestamp then stable ID. My order supplies accessible up/down controls
 within the current incomplete section, with focus restoration and a live position announcement.
@@ -825,6 +833,9 @@ STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.p
 GOAL_TEST_PAGE=skill.html STATISTICS_TEST_SCRIPT=goal-status-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit
 STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-polish-browser.js python3 tests/statistics-browser.py webkit
+STATISTICS_TEST_SCRIPT=journey-polish-browser.js python3 tests/statistics-browser.py webkit 390 844
+STATISTICS_TEST_SCRIPT=journey-polish-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-views-browser.js python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-views-browser.js STATISTICS_REDUCED_MOTION=1 python3 tests/statistics-browser.py webkit 390 844
 STATISTICS_TEST_SCRIPT=journey-browser.js python3 tests/statistics-browser.py webkit 390 844

@@ -11,10 +11,17 @@ and Statistics use the matching Midnight Archive palette. Existing layouts, labe
 controls and application logic are preserved. `styles.css` follows the existing
 Statistics visibility attribute to theme the header and dialogs without new state.
 MedievalSharp is reserved for headings and the character name; body text, controls,
-Skills, metadata and numbers use the system UI font stack. MedievalSharp is bundled in `assets/fonts/` under the included SIL Open Font License;
+Skills, metadata and numbers use the system UI font stack. Today goal titles use a readable
+Georgia/serif stack (14px Step, 15px Quest), including Cyrillic fallback. MedievalSharp is bundled in `assets/fonts/` under the included SIL Open Font License;
 no font service or new JavaScript dependency is required. Corner artwork adapts the
 provided reference SVG paths; the existing five streak frames retain their geometry
 and animations with muted colors. The storage key remains `neonGoalTracker.v1`.
+
+Today's cards retain their compact dimensions: sage Steps carry a small diamond, bronze Quests
+a scroll. Focus has a burgundy/ivory header and a thin 2px gold frame, stronger than either type
+in Other Tasks. Completed uses muted parchment without dimming whole cards or active children.
+Header counts align right; decorative icons are non-interactive CSS shapes. These rules are
+scoped to Journey and do not change the Goals board or Skill tree.
 
 Main-view navigation updates immediately and uses a single 220 ms CSS content fade
 with a matching background-color transition. Rapid switches cancel the prior fade;
