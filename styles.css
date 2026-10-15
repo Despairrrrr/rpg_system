@@ -39,6 +39,8 @@
   --motion-check: 200ms;
   --motion-float: 800ms;
   --motion-bar: 700ms;
+  --motion-sweep: 380ms;
+  --motion-burst: 560ms;
   --motion-levelup: 1200ms;
   --motion-menu: 150ms;
 
@@ -2225,25 +2227,72 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .progress, .progression-track { border-color: var(--border-soft); background: var(--bg-deep); }
 .progress-fill, .xp-fill { background: var(--gold); box-shadow: none; }
 .skill-fill {
+  --level-glow: #21d793;
   background:
     linear-gradient(110deg, transparent 40%, #c4ffe780 49%, transparent 58%) 140% 0 / 250% 100% no-repeat,
     linear-gradient(180deg, #8cf2c5 0%, #21d793 35%, #079f70 75%, #38e6a5 100%);
   box-shadow: inset 0 1px 0 #d6ffee66, 0 0 7px #15dc9666;
-  animation: progress-shimmer 4.8s ease-in-out infinite;
 }
 .xp-fill {
+  --level-glow: #edc459;
   background:
     linear-gradient(105deg, transparent 40%, #fff9dfcc 49%, transparent 58%) 140% 0 / 250% 100% no-repeat,
     linear-gradient(180deg, #fff1b0 0%, #edc459 28%, #c18b25 72%, #edc96d 100%);
   box-shadow: inset 0 1px 0 #fff5, 0 0 7px #edb84066;
-  animation: progress-shimmer 4.8s ease-in-out infinite;
 }
-@keyframes progress-shimmer {
-  0%, 12% { background-position: 140% 0, 0 0; }
-  78%, 100% { background-position: -40% 0, 0 0; }
+.skill-fill, .xp-fill { position: relative; }
+.skill-fill::after, .xp-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(105deg, transparent 35%, #f5c65cbb 44%,
+    #fff9dc 49%, #f5c65cbb 54%, transparent 63%) 140% 0 / 250% 100% no-repeat;
+}
+.is-xp-sweep::after { animation: xp-gold-sweep var(--motion-sweep) ease-out both; }
+@keyframes xp-gold-sweep {
+  0% { opacity: 0; background-position: 140% 0; }
+  15%, 80% { opacity: 1; }
+  100% { opacity: 0; background-position: -40% 0; }
+}
+/* Let the halo extend past the thin track, only near the next level. */
+.progress:has(.is-near-level, .is-level-up) { overflow: visible; }
+.skill-fill.is-near-level, .xp-fill.is-near-level {
+  animation: near-level-glow 4.2s ease-in-out infinite;
+}
+.skill-fill.is-level-up, .xp-fill.is-level-up {
+  animation: level-fill-burst var(--motion-burst) ease-out both;
+}
+@keyframes level-fill-burst {
+  0%, 100% { transform: scaleY(1); filter: brightness(1); }
+  30% {
+    transform: scaleY(1.8);
+    filter: brightness(1.5);
+    box-shadow: 0 0 12px #ffdf85, 0 0 26px #edc45999, inset 0 1px #fff;
+  }
+}
+@keyframes near-level-glow {
+  0%, 100% {
+    box-shadow: inset 0 1px 0 #fff4,
+      0 0 3px color-mix(in srgb, var(--level-glow) 20%, transparent);
+  }
+  45% {
+    box-shadow: inset 0 1px 0 #fff9,
+      0 0 9px color-mix(in srgb, var(--level-glow) 85%, transparent),
+      0 0 20px color-mix(in srgb, var(--level-glow) 45%, transparent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .skill-fill, .xp-fill { animation: none; }
+  .skill-fill, .xp-fill,
+  .skill-fill.is-near-level, .xp-fill.is-near-level,
+  .skill-fill.is-level-up, .xp-fill.is-level-up,
+  .is-xp-sweep::after { animation: none; }
+  .skill-fill.is-near-level, .xp-fill.is-near-level {
+    box-shadow: inset 0 1px 0 #fff5,
+      0 0 7px color-mix(in srgb, var(--level-glow) 45%, transparent);
+  }
 }
 .skill-row { border-bottom-color: var(--border-soft); }
 .skill-name { color: var(--text); }

@@ -924,6 +924,8 @@ const motionFallbackMs = {
   check: 200,
   float: 800,
   bar: 700,
+  sweep: 380,
+  burst: 560,
   levelup: 1200,
 };
 
@@ -1154,105 +1156,112 @@ function readFillPercent(fill) {
   return (fillWidth / trackWidth) * 100;
 }
 
-function animateFill(
-  fill,
-  fromPercent,
-  toPercent
-) {
-  if (!fill) {
-    return;
-  }
+// One cancellable sequence per fill. Renders, undo and rapid rewards supersede it.
+const fillFeedback = new Map();
+const fillMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  const target =
-    Math.max(
-      0,
-      Math.min(100, toPercent)
-    );
-
-  const start =
-    fromPercent == null
-      ? target
-      : Math.max(
-          0,
-          Math.min(100, fromPercent)
-        );
-
-  fill.classList.remove("is-animating");
-
-  if (
-    Math.abs(target - start) < 0.05
-  ) {
-    fill.style.width = `${target}%`;
-
-    return;
-  }
-
-  fill.style.width = `${start}%`;
-
-  // Force the start width to be applied before the transition is
-  // enabled, otherwise the bar jumps instead of animating.
-  void fill.offsetWidth;
-
-  fill.classList.add("is-animating");
-
-  fill.style.width = `${target}%`;
+function cancelFillFeedback(fill) {
+  const job = fillFeedback.get(fill);
+  if (job) clearTimeout(job.timer);
+  fillFeedback.delete(fill);
+  fill.classList.remove('is-animating', 'is-xp-sweep', 'is-level-up');
 }
+
+function updateLevelGlow(fill, percent) {
+  if (!fill) return;
+  cancelFillFeedback(fill);
+  fill.classList.toggle('is-near-level', Number.isFinite(percent) && percent >= 90);
+}
+
+function animateFill(fill, fromPercent, toPercent, options = {}) {
+  if (!fill) return;
+  cancelFillFeedback(fill);
+  const clamp = value => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+  const target = clamp(toPercent);
+  const start = fromPercent == null ? target : clamp(fromPercent);
+  const levelUp = options.awarded && options.levelUp;
+  const finish = () => {
+    updateLevelGlow(fill, target);
+    fill.style.width = `${target}%`;
+  };
+  if (fillMotionPreference.matches) {
+    if (levelUp) options.onLevelUp?.();
+    finish();
+    return;
+  }
+
+  fill.classList.remove('is-near-level');
+  const job = { timer: null, finish };
+  fillFeedback.set(fill, job);
+  const after = (duration, next) => {
+    job.timer = setTimeout(() => {
+      if (fillFeedback.get(fill) !== job) return;
+      if (!fill.isConnected) { cancelFillFeedback(fill); return; }
+      next();
+    }, duration);
+  };
+  const move = (from, to) => {
+    fill.classList.remove('is-animating');
+    fill.style.width = `${from}%`;
+    void fill.offsetWidth;
+    fill.classList.add('is-animating');
+    fill.style.width = `${to}%`;
+  };
+  const afterSweep = () => {
+    fill.classList.remove('is-xp-sweep');
+    if (!levelUp) { finish(); return; }
+    fill.classList.add('is-level-up');
+    options.onLevelUp?.();
+    after(getMotionMs('burst'), () => {
+      fill.classList.remove('is-level-up');
+      // A new level starts at zero, then receives any remaining XP.
+      move(0, target);
+      if (target === 0) finish();
+      else after(getMotionMs('bar'), finish);
+    });
+  };
+  const afterFill = () => {
+    fill.classList.remove('is-animating');
+    if (!options.awarded) { finish(); return; }
+    fill.classList.add('is-xp-sweep');
+    after(getMotionMs('sweep'), afterSweep);
+  };
+  const firstTarget = levelUp ? 100 : target;
+  move(start, firstTarget);
+  if (Math.abs(firstTarget - start) < 0.05) afterFill();
+  else after(getMotionMs('bar'), afterFill);
+}
+
+fillMotionPreference.addEventListener('change', event => {
+  if (event.matches) {
+    for (const job of [...fillFeedback.values()]) job.finish();
+  }
+});
 
 
 // One click can produce several events: the goal itself, a skill
-// level-up and a player level-up. This plays them in order.
-function runCompletionFeedback(
-  fx,
-  events
-) {
-  if (fx.awarded) showFloatingXp(fx.rect, fx.xp);
-
+// level-up and a player level-up. Toasts follow each completed bar sweep.
+function runCompletionFeedback(fx, events) {
+  if (fx.awarded) {
+    showFloatingXp(fx.rect, fx.xp);
+    playCheckPop(fx.goalId);
+  }
+  const feedbackOptions = (event, kicker) => ({
+    awarded: fx.awarded,
+    levelUp: Boolean(event),
+    onLevelUp: event ? () => queueLevelUp({ kicker, from: event.from, to: event.to }) : null,
+  });
   animateFill(
-    els.xpBar,
-    fx.fromPlayerPercent,
-    fx.toPlayerPercent
+    els.xpBar, fx.fromPlayerPercent, fx.toPlayerPercent,
+    feedbackOptions(events.player, 'LEVEL UP')
   );
-
   if (fx.skillId) {
     animateFill(
-      document.querySelector(
-        `.skill-row[data-id="${CSS.escape(fx.skillId)}"] .skill-fill`
-      ),
-      fx.fromSkillPercent,
-      fx.toSkillPercent
+      document.querySelector(`.skill-row[data-id="${CSS.escape(fx.skillId)}"] .skill-fill`),
+      fx.fromSkillPercent, fx.toSkillPercent,
+      feedbackOptions(events.skill, `${events.skill?.name ?? ''} LEVEL UP`.toUpperCase())
     );
   }
-
-  if (!fx.awarded) return;
-  playCheckPop(fx.goalId);
-
-  const levelUps = [];
-
-  if (events.skill) {
-    levelUps.push({
-      kicker:
-        `${events.skill.name} LEVEL UP`.toUpperCase(),
-      from: events.skill.from,
-      to: events.skill.to,
-    });
-  }
-
-  if (events.player) {
-    levelUps.push({
-      kicker: "LEVEL UP",
-      from: events.player.from,
-      to: events.player.to,
-    });
-  }
-
-  if (levelUps.length === 0) {
-    return;
-  }
-
-  // The bars land first, then the level-up confirms the result.
-  setTimeout(() => {
-    levelUps.forEach(queueLevelUp);
-  }, getMotionMs("bar"));
 }
 
 
@@ -1310,6 +1319,7 @@ function renderProfile() {
 
   els.xpBar.style.width =
     `${info.progress}%`;
+  updateLevelGlow(els.xpBar, info.progress);
 
   renderAvatar();
 }
@@ -2805,6 +2815,7 @@ function renderSkills() {
       ".skill-fill"
     ).style.width =
       `${info.progress}%`;
+    updateLevelGlow(row.querySelector(".skill-fill"), info.progress);
 
     const trigger = row.querySelector(".skill-menu-trigger");
     trigger.setAttribute("aria-label", `Actions for ${skill.name}`);

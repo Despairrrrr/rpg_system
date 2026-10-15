@@ -5,7 +5,7 @@
 The shared palette retains quiet parchment for Journey/Goals and deep Midnight Archive
 surfaces for the sidebar, Skill page and Statistics. Mineral green, metallic gold and
 wine accents add depth, with restrained satin gradients on panels and primary buttons.
-User XP remains shimmering gold and Skills remain shimmering emerald. Palette changes
+User XP remains gold and Skills remain emerald. Palette changes
 do not alter layout or data behavior.
 
 These decisions describe the implemented interface and must be preserved when adding
@@ -39,10 +39,14 @@ The dashboard and Skill page render Goals separately, so changes to Goal actions
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
 
-Skills progress fills use an emerald gradient; the user's XP fill uses a luminous
-gold gradient. Both share a soft glow and a 4.8-second shimmer in `styles.css`.
-Reduced motion disables the shimmer; XP values and width transitions continue to
-use the existing renderer.
+Skills progress fills use emerald; the user's XP fill uses gold. Reward feedback
+sequences a 700 ms fill, a 380 ms gold sweep and, at progress >= 90%, a 4.2-second
+glow pulse. Level-up fills to 100%, sweeps, flashes for 560 ms, then fills the new
+level's remaining XP; the toast is queued with the flash. CSS motion tokens control
+the timings. Each fill has one cancellable job: undo, re-render and newer rewards
+invalidate pending effects. Reduced motion settles immediately with a static halo
+at 90%; enabling it mid-sequence also settles pending jobs. Verify with
+`gjs tests/level-glow.js` from `front/`.
 
 Life History / Chronicles was reverted and is not present in this implementation.
 

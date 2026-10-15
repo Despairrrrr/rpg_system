@@ -19,9 +19,12 @@ no font service or new JavaScript dependency is required. Corner artwork adapts 
 provided reference SVG paths; the existing five streak frames retain their geometry
 and animations with muted colors. The storage key remains `neonGoalTracker.v1`.
 
-Skills progress bars use a vivid emerald gradient. The user's XP bar uses the
-luminous gold gradient from `gold-progress.html`. Both have a soft glow and a slow
-shimmer; reduced motion keeps their colors but disables the shimmer.
+Skills progress bars use an emerald gradient; the user's XP bar uses the gold
+finish from `gold-progress.html`. Rewards fill the bar over 700 ms, then send a
+380 ms gold highlight across it. At 90% or more, a slow 4.2-second glow pulse follows.
+Level-up fills the old level to 100%, sweeps, flashes for 560 ms, then fills the new
+level with remaining XP. Undo and fresh renders cancel obsolete effects. Reduced
+motion settles immediately, with a static halo at 90% or more.
 
 Today's cards retain their compact dimensions: emerald Steps carry a small diamond, amber Quests
 a scroll. Focus has a wine/ivory header and a thin 2px gold frame, stronger than either type
