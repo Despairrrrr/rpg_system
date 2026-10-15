@@ -219,13 +219,14 @@ state = {
    XP-бар; анимации на CSS-переменных `--motion-*` с reduced-motion фолбэками.
 9. Дизайн: тёплый пергамент Journey/Goals (`--bg #E8DCC0`, `--surface #F2EAD2`),
    Midnight Archive для профиля/Skills, skill.html и Statistics. MedievalSharp — для заголовков;
-   системный UI-шрифт — для кнопок/метаданных, Georgia/serif — для названий целей только в Today.
+   системный UI-шрифт — для кнопок/метаданных, Georgia/serif — для названий целей во всех трёх представлениях.
    В Today Step — sage с ромбом, Quest — bronze со свитком, левая полоса 3px; Focus сильнее типа:
    бордовый заголовок, ivory-текст и рамка gold 2px на карточках против 1px в Other Tasks.
    Completed приглушён, без opacity всей карточки; активные дети не затемняются. Заголовки 44px,
    размеры/отступы списков сохранены; CSS-значки неинтерактивны, внешних ресурсов нет.
-   Стиль ограничен Journey. На Goals/Skill сохраняются structural accent borders и существующие
-   макеты; XP вторичен. Анимация навигации 220ms, `prefers-reduced-motion` её отключает.
+   Goals/Skill переиспользуют токены Journey и компактные row/content-примитивы через
+   applyGoalCardPresentation(); Arc — бордовый SVG-шестиугольник, включая parent references.
+   Колонки Goals сохранены; Skill сохраняет тёмные поверхности и компактные отступы дерева. XP вторичен. Анимация навигации 220ms, `prefers-reduced-motion` её отключает.
 10. Модалки — нативные `<dialog>.showModal()`; удаления — браузерные `confirm()`;
     гарды — `alert()`. Это текущая конвенция.
 
@@ -420,8 +421,9 @@ BEHAVIOR TO PRESERVE (accepted product decisions, not bugs):
     increases strictly on user saves but maintenance saves must not bump it.
 11. Visual language: warm parchment for Journey/Goals; Midnight Archive for profile/Skills,
     Skill detail and Statistics. MedievalSharp headings, system UI controls/metadata, Georgia/serif
-    Today goal titles (14px Step, 15px Quest). Journey-only sage/diamond Steps and bronze/scroll
-    Quests use 3px left accents. Focus outranks type: burgundy/ivory header, 2px gold card frame;
+    goal titles across Today/Goals/Skill (14px Step, 15px Quest/Arc). Shared sage/diamond Steps,
+    bronze/scroll Quests and burgundy/hexagon Arcs use 3px left accents.
+    applyGoalCardPresentation() reuses controls in compact rows; Skill surfaces stay dark. Focus outranks type: burgundy/ivory header, 2px gold card frame;
     Other uses 1px type frames; Completed is subdued without dimming active children. Keep compact
     dimensions, structural Goal/Skill accents, motion tokens and reduced-motion fallbacks.
     Bump shared cache versions consistently across pages. CSS icons are non-interactive.

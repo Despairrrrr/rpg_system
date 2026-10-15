@@ -93,8 +93,9 @@ it survives rerender, view switching and storage/cloud refresh without persisten
 No collapse animation is required. Collapsing does not change calculations or membership.
 Completing into a collapsed section moves keyboard focus to its header.
 
-Journey styling is scoped to `#journeyList`: Step uses sage, a diamond and a 3px left stripe;
-Quest uses bronze, a scroll and the same compact geometry. Focus takes precedence over type,
+Journey supplies shared type tokens and compact style primitives to Goals and Skill cards:
+Step uses sage, a diamond and a 3px left stripe; Quest uses bronze and a scroll; Arc uses
+muted burgundy and an outlined SVG hexagon. Parent references use their parent’s symbol. Focus takes precedence over type,
 with a burgundy/ivory 44px header and a 2px gold card border; Other keeps a 1px type border.
 Completed retains readable metadata and a visible sage check without whole-card opacity.
 Nested Steps retain their own sage icon inside Quests. Goal titles use Georgia/serif at 14/15px;
@@ -920,12 +921,22 @@ uncategorized rewards, stacked proportions, recurring events, keyboard tooltips/
 
 ## Goals page visual hierarchy
 
-Columns keep their muted fantasy accent borders while inner lists have no extra frame and cards
-use subdued surfaces. Step/Quest/Arc share one layout with progressively larger padding
-and title sizes. XP sits below the title in smaller, muted text. Completed cards keep a
-readable title, state badge and usable controls but lose the bright outline/glow. Completed
-parents do not visually mark active tree children as completed. Empty descriptions are
-hidden, and Skill/parent metadata wraps into compact tags without truncating information.
+Columns retain their structure and outer accents. Cards reuse Journey’s compact row/content
+primitives, 7px corners, 1px type border and 3px left accent. Step is sage/diamond, Quest
+amber/scroll, Arc burgundy/outlined hexagon; the same SVG masks appear on parent references.
+`applyGoalCardPresentation()` arranges existing renderer nodes without changing their handlers.
+Titles use Georgia (14px Step, 15px Quest/Arc); XP, schedules, state and Skill/parent metadata
+wrap together. Padding is 8px 10px for Steps, 10px for Quest/Arc, and 7px 8px on mobile;
+card gaps are 7px. Descriptions are content-driven and hidden when empty. Skill cards use dark
+tinted surfaces with small nested-list indents, without the old Arc inset frame. Completed
+cards stay readable; active children retain their own type styling. Journey alone retains
+its Focus frame, section hierarchy, bookmarks and ordering controls.
+
+Verify shared presentation at both desktop/mobile widths with
+`STATISTICS_TEST_SCRIPT=goal-presentation-browser.js python3 tests/statistics-browser.py webkit`
+and the same command prefixed with `GOAL_TEST_PAGE=skill.html`. Append `390 844` for mobile.
+The fixture checks type colours/icons, Journey parity, dark surfaces, nesting, wrapping,
+compactness, schedule labels, menu keyboard focus and completion/undo rewards.
 
 The Skills panel uses two progress columns on wide screens and one at viewport widths
 up to 720px. In compact columns the level moves below the name to keep values readable.

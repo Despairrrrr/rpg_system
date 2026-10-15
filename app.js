@@ -2370,7 +2370,13 @@ function journeyGoalCard(goal, now, manualGoals) {
   }
   if (goal.type === 'step' && goal.parentGoalId) {
     const parent = state.goals.find(item => item.id === goal.parentGoalId);
-    if (parent) metadata.append(journeyElement('span', 'journey-parent', `Part of ${parent.title}`));
+    if (parent) {
+      const reference = journeyElement('span', 'journey-parent', `Part of ${parent.title}`);
+      reference.classList.add('goal-type-reference');
+      reference.dataset.goalType = parent.type;
+      reference.title = `${parent.type === 'arc' ? 'Arc' : 'Quest'}: ${parent.title}`;
+      metadata.append(reference);
+    }
   }
   if (goal.type === 'quest') {
     const children = journeyChildren(goal, state.goals, state.journey);
@@ -2522,6 +2528,31 @@ document.getElementById('createJourneyGoal')?.addEventListener('click', () => {
 });
 
 
+// Share Journey's compact row/content presentation while keeping each renderer's
+// existing controls, handlers and nested lists. This helper never writes Goal data.
+function applyGoalCardPresentation(host, goal) {
+  host.classList.add('goal-presentation');
+  host.dataset.goalType = goal.type;
+  const row = host.querySelector('.goal-card-top, .goal-tree-top');
+  row.classList.add('goal-card-row');
+  const title = row.querySelector('h3, .goal-tree-title');
+  title.classList.add('goal-card-title');
+  title.title = goal.type === 'arc' ? 'Arc' : goal.type === 'quest' ? 'Quest' : 'Step';
+  const check = row.querySelector('.goal-check');
+  check.querySelector('input').setAttribute('aria-label', `Complete ${goal.title}`);
+  const xp = row.querySelector('.goal-xp, .goal-tree-xp');
+  xp.classList.add('goal-xp');
+  const metadata = host.querySelector('.goal-metadata') || journeyElement('div', 'goal-metadata');
+  metadata.append(xp, host.querySelector('.goal-repeat-badge'), host.querySelector('.goal-state'));
+  const content = journeyElement('div', 'goal-card-content');
+  const description = host.querySelector('.goal-description, .goal-tree-desc');
+  description.classList.add('goal-card-description');
+  content.append(title, metadata, description);
+  const actions = host.querySelector('.goal-card-actions, .goal-tree-actions');
+  row.append(check, content, actions.querySelector('.goal-menu-trigger'));
+  actions.remove();
+}
+
 function renderGoals() {
   const query =
     (els.searchInput?.value ?? "")
@@ -2662,6 +2693,9 @@ function renderGoals() {
           : null;
 
       if (parent) {
+        parentEl.classList.add('goal-type-reference');
+        parentEl.dataset.goalType = parent.type;
+        parentEl.title = `${parent.type === 'arc' ? 'Arc' : 'Quest'}: ${parent.title}`;
         parentEl.querySelector(
           ".goal-parent-title"
         ).textContent =
@@ -2710,6 +2744,7 @@ function renderGoals() {
         goal
       );
 
+      applyGoalCardPresentation(card, goal);
       list.append(card);
     });
   });
@@ -3081,7 +3116,7 @@ function renderGoalTreeNode(
   );
 
   const title =
-    document.createElement("span");
+    document.createElement("h3");
 
   title.className =
     "goal-tree-title";
@@ -3168,6 +3203,7 @@ function renderGoalTreeNode(
     }
   );
 
+  applyGoalCardPresentation(item, goal);
   parentList.append(item);
 
   if (

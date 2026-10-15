@@ -30,8 +30,10 @@ motion settles immediately, with a static halo at 90% or more.
 Today's cards retain their compact dimensions: emerald Steps carry a small diamond, amber Quests
 a scroll. Focus has a wine/ivory header and a thin 2px gold frame, stronger than either type
 in Other Tasks. Completed uses muted parchment without dimming whole cards or active children.
-Header counts align right; decorative icons are non-interactive CSS shapes. These rules are
-scoped to Journey and do not change the Goals board or Skill tree.
+Header counts align right; decorative icons are non-interactive SVG masks. Goals and Skill
+cards reuse the Journey type palette, compact row/content styles and Georgia titles.
+Arcs use the existing burgundy family with an outlined hexagon, including parent references.
+Journey retains its Focus frame and controls; Skill cards keep dark surfaces and nested lists.
 
 Main-view navigation updates immediately and uses a single 220 ms CSS content fade
 with a matching background-color transition. Rapid switches cancel the prior fade;
@@ -315,10 +317,13 @@ Run presentation-state checks from `front` with `gjs tests/streak-motion.js` or 
 
 ### Goals and Skills presentation
 
-Goal columns carry natural fantasy accents; inner cards use softer borders. Steps are
-compact, Quests medium, and Arcs slightly more spacious. Completed Goals are quieter and
-sort to the bottom of their column, XP is secondary to the title, and Skill/parent
-metadata uses compact wrapping tags. Skills
+Goal columns retain their structure and accents. Cards share Journey’s content-driven
+spacing (8px/10px Step, 10px Quest/Arc; 7px/8px on mobile), 7px corners and 3px type stripe.
+`applyGoalCardPresentation()` groups existing controls into the shared row/content primitives
+without replacing completion or menu handlers. XP, schedule, completion and Skill/parent
+metadata wrap together, with descriptions below. Completed Goals remain quieter and sort
+to the bottom; completed parents never dim active children. Skill trees keep subtle
+indentation and dark tinted surfaces instead of light parchment. Skills
 appear in two progress columns on wide screens and one on narrow screens (up to 720px),
 with a visible keyboard/touch-accessible
 **… → Edit / Delete** menu. These are presentation changes only; progression and data
