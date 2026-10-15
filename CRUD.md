@@ -39,7 +39,8 @@ The dashboard and Skill page render Goals separately, so changes to Goal actions
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
 
-Skills progress fills use emerald; the user's XP fill uses gold. Reward feedback
+Skills progress fills use fresh emerald (`#287A50`) with lighter green highlights and deep `#1E4C34` shading;
+the user's XP fill uses gold. Reward feedback
 sequences a 700 ms fill, a 380 ms gold sweep and, at progress >= 90%, a 4.2-second
 glow pulse. Level-up fills to 100%, sweeps, flashes for 560 ms, then fills the new
 level's remaining XP; the toast is queued with the flash. CSS motion tokens control
