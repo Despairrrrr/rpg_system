@@ -2,6 +2,11 @@
 
 ## Current interface contract
 
+The shared palette uses bright warm parchment for Journey/Goals and rich teal-blue
+surfaces for the sidebar, Skill page and Statistics. Emerald, amber and berry accents
+distinguish types; text colors retain contrast. User XP remains shimmering gold and
+Skills remain shimmering emerald. Palette changes do not alter layout or data behavior.
+
 These decisions describe the implemented interface and must be preserved when adding
 unrelated features. Change them only when the user's new request calls for it, and update
 this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent guidance.

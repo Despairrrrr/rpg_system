@@ -6,8 +6,10 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 
 ## Visual skin
 
-Journey and Goals use warm parchment; the profile/Skills panels, Skill detail page
-and Statistics use the matching Midnight Archive palette. Existing layouts, labels,
+Journey and Goals use bright warm parchment with emerald, amber and berry accents;
+the profile/Skills panels, Skill detail page and Statistics use richer teal-blue
+Midnight Archive surfaces with brighter gold and jewel colors. Text retains strong
+contrast against both palettes. Existing layouts, labels,
 controls and application logic are preserved. `styles.css` follows the existing
 Statistics visibility attribute to theme the header and dialogs without new state.
 MedievalSharp is reserved for headings and the character name; body text, controls,
@@ -21,8 +23,8 @@ Skills progress bars use a vivid emerald gradient. The user's XP bar uses the
 luminous gold gradient from `gold-progress.html`. Both have a soft glow and a slow
 shimmer; reduced motion keeps their colors but disables the shimmer.
 
-Today's cards retain their compact dimensions: sage Steps carry a small diamond, bronze Quests
-a scroll. Focus has a burgundy/ivory header and a thin 2px gold frame, stronger than either type
+Today's cards retain their compact dimensions: emerald Steps carry a small diamond, amber Quests
+a scroll. Focus has a berry/ivory header and a thin 2px gold frame, stronger than either type
 in Other Tasks. Completed uses muted parchment without dimming whole cards or active children.
 Header counts align right; decorative icons are non-interactive CSS shapes. These rules are
 scoped to Journey and do not change the Goals board or Skill tree.
@@ -309,7 +311,7 @@ Run presentation-state checks from `front` with `gjs tests/streak-motion.js` or 
 
 ### Goals and Skills presentation
 
-Goal columns carry the muted fantasy accents; inner cards use softer borders. Steps are
+Goal columns carry saturated fantasy accents; inner cards use softer borders. Steps are
 compact, Quests medium, and Arcs slightly more spacious. Completed Goals are quieter and
 sort to the bottom of their column, XP is secondary to the title, and Skill/parent
 metadata uses compact wrapping tags. Skills

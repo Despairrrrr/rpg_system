@@ -1,4 +1,4 @@
-/* Quiet Fantasy: shared palette, with Midnight Archive surfaces below.
+/* Vivid Fantasy: warm parchment and jewel-toned Midnight Archive surfaces.
    The legacy accent names remain aliases because chart rendering reads them. */
 @font-face {
   font-family: 'MedievalSharp';
@@ -12,25 +12,25 @@
   --font-display: 'MedievalSharp', Georgia, serif;
   --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --motion-view: 220ms;
-  --bg: #E8DCC0;
-  --bg-deep: #DCC9A0;
-  --surface: #F2EAD2;
-  --surface-hover: #EBE0C4;
-  --ink: #2A2218;
-  --ink-soft: #5A4E3E;
-  --ink-faint: #8A7C66;
-  --border: #C4B18A;
-  --border-soft: #D6C7A5;
-  --gold: #A67C2E;
-  --gold-soft: #C9A55A;
-  --gold-dim: #80602D;
-  --sage: #6B7F5E;
-  --sage-dim: #526447;
-  --burgundy: #6B3A3A;
-  --danger-text: #6B3A3A;
-  --iron: #3A2F22;
-  --accent-text: #76551F;
-  --success-text: #4C603F;
+  --bg: #F4E3B8;
+  --bg-deep: #EAD09A;
+  --surface: #FFF5DC;
+  --surface-hover: #FFE9B8;
+  --ink: #292016;
+  --ink-soft: #59462E;
+  --ink-faint: #78613F;
+  --border: #C9A363;
+  --border-soft: #E1C68E;
+  --gold: #BD8519;
+  --gold-soft: #E4AF36;
+  --gold-dim: #8B601B;
+  --sage: #238659;
+  --sage-dim: #196B46;
+  --burgundy: #A73550;
+  --danger-text: #A73550;
+  --iron: #44301C;
+  --accent-text: #80520C;
+  --success-text: #216B43;
   --shadow: 0 4px 12px rgba(42, 34, 24, 0.08);
   --radius: 12px;
   /* Motion tokens: single source of truth for CSS and app.js
@@ -54,25 +54,25 @@ html:has(#statisticsPage:not([hidden])) { color-scheme: dark; }
 /* CSS follows the existing visible view; no application state is added. */
 body[data-page="skill"], body:has(#statisticsPage:not([hidden])), .sidebar {
   color-scheme: dark;
-  --bg: #0F2230;
-  --bg-deep: #0A1822;
-  --surface: #132B3A;
-  --surface-hover: #1A3648;
-  --ink: #F3E8D2;
-  --ink-soft: #C3B69E;
-  --ink-faint: #958874;
-  --border: #2A4A5E;
-  --border-soft: #1F3A4E;
-  --gold: #B88A44;
-  --gold-soft: #D4B07A;
-  --gold-dim: #6B5A3A;
-  --sage: #6BC4A4;
-  --sage-dim: #3A6B5A;
-  --burgundy: #B86A6A;
-  --danger-text: #CA8888;
-  --iron: #6B5A3A;
-  --accent-text: #D4B07A;
-  --success-text: #6BC4A4;
+  --bg: #0B293A;
+  --bg-deep: #061C29;
+  --surface: #11384B;
+  --surface-hover: #194B60;
+  --ink: #FFF4DC;
+  --ink-soft: #D9CDB6;
+  --ink-faint: #B1A389;
+  --border: #32677D;
+  --border-soft: #245164;
+  --gold: #EFB63F;
+  --gold-soft: #FFDA82;
+  --gold-dim: #A07730;
+  --sage: #33DBA1;
+  --sage-dim: #187C62;
+  --burgundy: #ED7791;
+  --danger-text: #FF99AA;
+  --iron: #A07730;
+  --accent-text: #FFDA82;
+  --success-text: #33DBA1;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
@@ -100,9 +100,9 @@ body {
   font-size: 15px;
   color: var(--text);
   background:
-    radial-gradient(ellipse at center, transparent 55%, rgba(80, 60, 35, .18) 100%),
-    radial-gradient(ellipse at top left, rgba(90, 70, 40, .12), transparent 35%),
-    radial-gradient(ellipse at bottom right, rgba(90, 70, 40, .14), transparent 35%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(166, 99, 19, .10) 100%),
+    radial-gradient(ellipse at top left, rgba(245, 186, 68, .14), transparent 35%),
+    radial-gradient(ellipse at bottom right, rgba(224, 148, 42, .10), transparent 35%),
     var(--bg);
 }
 
@@ -855,8 +855,8 @@ button { cursor: pointer; }
 .streak-badge--tier-3,
 .streak-badge--tier-4 {
   --sb-text: var(--text);
-  --sb-flame-outer: #B88A44;
-  --sb-flame-inner: #D4B07A;
+  --sb-flame-outer: #EFB63F;
+  --sb-flame-inner: #FFDA82;
 }
 
 .streak-badge--tier-1 {
@@ -877,8 +877,8 @@ button { cursor: pointer; }
 .streak-badge--tier-4 {
   --sb-art: url("assets/streak-tier-4.svg?v=2");
   --sb-glow: #B88A4414;
-  --sb-flame-outer: #B86A6A;
-  --sb-flame-inner: #D4B07A;
+  --sb-flame-outer: #ED7791;
+  --sb-flame-inner: #FFDA82;
 }
 
 /* Motion hierarchy: the fire moves; the frame keeps its weight and position. */
@@ -2095,7 +2095,7 @@ body::before {
   opacity: .04;
 }
 body[data-page="skill"], body:has(#statisticsPage:not([hidden])) {
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, .4)), var(--bg);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, .24)), var(--bg);
 }
 body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before {
   background-image: radial-gradient(1px 1px at 20% 30%, #fff, transparent),
@@ -2144,7 +2144,7 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .nav-item:hover, .nav-back:hover { color: var(--accent-text); }
 .primary-btn {
   color: var(--accent-text);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 14%, var(--surface)), var(--surface));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 25%, var(--surface)), var(--surface));
 }
 .secondary-btn, .mini-btn, .nav-back, .auth-btn, .reminder-bell {
   color: var(--muted);
@@ -2241,12 +2241,12 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .statistics-total, .summary-metric:first-child strong { color: var(--sage); }
 .statistics-page {
   /* Six stable Area accents; preserve the renderer's identity-to-token mapping. */
-  --blue: #93B5BD;
-  --green: #6BC4A4;
-  --goal-quest: #B88A44;
-  --goal-step: #8DAF98;
-  --orange: #CA8888;
-  --yellow: #D4B07A;
+  --blue: #63CDEE;
+  --green: #33DBA1;
+  --goal-quest: #EFB63F;
+  --goal-step: #67E3B3;
+  --orange: #FF99AA;
+  --yellow: #FFDA82;
 }
 .activity-step { background: var(--sage); }
 .summary-metric:last-child strong { color: var(--gold-soft); }
@@ -2319,18 +2319,18 @@ body { transition: background-color var(--motion-view) ease-out; }
 /* Compact quest journal: local tokens keep priority separate from Goal type.
    No styles below affect the Goals board, Skill tree or Forecast. */
 #journeyList {
-  --journey-step: #6D876E;
-  --journey-step-ink: #53765A;
-  --journey-step-surface: #EEF0DF;
-  --journey-step-border: #B5C0A5;
-  --journey-quest: #B27A3E;
-  --journey-quest-ink: #996329;
-  --journey-quest-surface: #F4E7CE;
-  --journey-quest-border: #C9AB77;
-  --journey-focus: #B58A3D;
-  --journey-highlight: #D0AB69;
-  --journey-burgundy: #532F35;
-  --journey-ivory: #FFF4DE;
+  --journey-step: #22966A;
+  --journey-step-ink: #176B49;
+  --journey-step-surface: #E3F4DD;
+  --journey-step-border: #8CC79A;
+  --journey-quest: #CF8B21;
+  --journey-quest-ink: #885510;
+  --journey-quest-surface: #FFF0C7;
+  --journey-quest-border: #DFB45E;
+  --journey-focus: #DDA633;
+  --journey-highlight: #FFD579;
+  --journey-burgundy: #7E2945;
+  --journey-ivory: #FFF6DF;
   --journey-step-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m8 2 5 6-5 6-5-6Z' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
   --journey-quest-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 3h8v9a2 2 0 0 1-4 0H2V5a2 2 0 0 1 4 0h8a2 2 0 0 0-2-2M5 7h5M5 9h4M2 12h10' fill='none' stroke='black' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E");
   --journey-bookmark-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 2h8v12l-4-3-4 3Z' fill='none' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E");
