@@ -33,6 +33,11 @@ The dashboard and Skill page render Goals separately, so changes to Goal actions
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
 
+Skills progress fills use an emerald gradient; the user's XP fill uses a luminous
+gold gradient. Both share a soft glow and a 4.8-second shimmer in `styles.css`.
+Reduced motion disables the shimmer; XP values and width transitions continue to
+use the existing renderer.
+
 Life History / Chronicles was reverted and is not present in this implementation.
 
 Old screenshots and commits may show the removed controls. They are not a specification

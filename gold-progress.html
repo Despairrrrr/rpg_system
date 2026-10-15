@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Золотая шкала прогресса</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: radial-gradient(ellipse at 50% 45%, #193747, #0b1c26 75%);
+      color: #f4eedf;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    .skill {
+      width: min(100%, 540px);
+      padding: 30px 32px;
+      border: 1px solid #b9904536;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #193340, #122a37);
+      box-shadow: 0 20px 70px #0004, inset 0 1px #fff05;
+    }
+
+    .skill-heading {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-bottom: 16px;
+    }
+
+    .skill-name { margin: 0; flex: 1; font-size: 16px; font-weight: 500; }
+    .skill-level { color: #d1bd8b; font-size: 12px; white-space: nowrap; }
+    .skill-xp { color: #c4bda9; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .skill-xp strong { color: #f3d891; font-weight: 500; }
+
+    .gold-progress {
+      height: 8px;
+      padding: 1px;
+      border-radius: 999px;
+      background: #081a24;
+      box-shadow: 0 0 0 1px #c69d4530, inset 0 2px 4px #0008;
+    }
+
+    .gold-progress-fill {
+      position: relative;
+      height: 100%;
+      border-radius: inherit;
+      /* Match the percentage to aria-valuenow / aria-valuemax below. */
+      width: 70.588235%;
+      background:
+        linear-gradient(105deg, transparent 35%, #fff9dfcc 49%, transparent 63%) -160px 0 / 160px 100% no-repeat,
+        linear-gradient(180deg, #fff1b0 0%, #edc459 28%, #c18b25 72%, #edc96d 100%);
+      box-shadow: 0 0 12px #edb84066, inset 0 1px #fff5;
+      animation: gold-shimmer 4.8s ease-in-out infinite;
+    }
+
+    @keyframes gold-shimmer {
+      0%, 12% { background-position: -160px 0, 0 0; }
+      75%, 100% { background-position: 540px 0, 0 0; }
+    }
+
+    .skill-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 14px;
+      color: #99a8aa;
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+
+    .skill-footer span:last-child { color: #cdb77e; }
+
+    @media (max-width: 420px) {
+      body { padding: 16px; }
+      .skill { padding: 24px 20px; }
+      .skill-heading { gap: 8px 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gold-progress-fill { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="skill" aria-labelledby="skill-name">
+    <div class="skill-heading">
+      <h1 class="skill-name" id="skill-name">fitness</h1>
+      <span class="skill-level">Lvl. 9</span>
+      <span class="skill-xp"><strong>1200</strong> / 1700 XP</span>
+    </div>
+    <div class="gold-progress" role="progressbar" aria-valuenow="1200" aria-valuemin="0" aria-valuemax="1700" aria-labelledby="skill-name" aria-valuetext="1200 из 1700 XP">
+      <div class="gold-progress-fill"></div>
+    </div>
+    <div class="skill-footer">
+      <span>До следующего уровня</span>
+      <span>500 XP</span>
+    </div>
+  </main>
+</body>
+</html>

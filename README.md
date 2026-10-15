@@ -17,6 +17,10 @@ no font service or new JavaScript dependency is required. Corner artwork adapts 
 provided reference SVG paths; the existing five streak frames retain their geometry
 and animations with muted colors. The storage key remains `neonGoalTracker.v1`.
 
+Skills progress bars use a vivid emerald gradient. The user's XP bar uses the
+luminous gold gradient from `gold-progress.html`. Both have a soft glow and a slow
+shimmer; reduced motion keeps their colors but disables the shimmer.
+
 Today's cards retain their compact dimensions: sage Steps carry a small diamond, bronze Quests
 a scroll. Focus has a burgundy/ivory header and a thin 2px gold frame, stronger than either type
 in Other Tasks. Completed uses muted parchment without dimming whole cards or active children.
