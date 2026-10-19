@@ -2,11 +2,21 @@
 
 ## Current interface contract
 
-The shared palette retains quiet parchment for Journey/Goals and deep Midnight Archive
-surfaces for the sidebar, Skill page and Statistics. Mineral green, metallic gold and
-wine accents add depth, with restrained satin gradients on panels and primary buttons.
-User XP remains gold and Skills remain emerald. Palette changes
-do not alter layout or data behavior.
+Journey/Goals retain parchment surfaces; the profile/Skills sidebar uses teal/emerald
+translucent glass (86–90% opacity), 12px backdrop blur, glowing cyan borders and white
+text with a turquoise halo. The emerald centre fades to dark blue-green edges. White
+diamonds sit at all four corners; there are no neon corner brackets or Status
+Window caption. MedievalSharp returns for the name and Skills heading, with system UI
+text elsewhere. Skill creation is a **+** button with an accessible Add skill label;
+Skill **…** button contours fade in only on hover (180 ms), with visible keyboard focus.
+Edit and **+** restore 10px rounded corners; Add Goal keeps its outlined cyan control.
+The avatar has two outer cyan arcs rotating clockwise over 12 seconds at the former
+dashed-guide radius; the guide and solid middle ring are absent. Reduced motion stops rotation. Photo upload
+and menu behavior remain. The original five SVG streak frames and animations return.
+Progress tracks restore their rounded shape, satin gold XP / white Skill fills
+and original reward effects. Skill detail and Statistics retain their surfaces and
+chart palette. The translucent gradient works without blur support. Names, XP, Skills
+and all persistence remain unchanged.
 
 These decisions describe the implemented interface and must be preserved when adding
 unrelated features. Change them only when the user's new request calls for it, and update
@@ -23,7 +33,7 @@ this section at the same time. See also [AGENTS.md](AGENTS.md) for coding-agent 
 | Dashboard Goals | One **…** menu containing Edit, Delete and own-status Pause goal / Resume goal | `#goalCardTemplate`, `renderGoals()`, `createGoalActionsMenu()` |
 | Goals inside a Skill | The same **…** menu; no permanent Edit/Delete buttons | `renderGoalTreeNode()`, `createGoalActionsMenu()` |
 | Skill rows | Aligned progress list with **… → Edit / Delete** and link to `skill.html?id=...` | `#skillCardTemplate`, `renderSkills()` |
-| Skill creation | **+ Add skill** in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
+| Skill creation | **+** (accessible label **Add skill**) in the dashboard Skills panel | `#openSkillModalBtn`, `openSkillModal()` |
 | Statistics → Life Areas | Create/rename/delete Areas and assign existing Skills; no **+ Create a Skill** button | `#lifeAreasModal`, `createStatisticsView()` |
 | Statistics overview | Week selector plus Goals completed and XP earned only; no Active Skills metric | `#weekSummary`, `#summaryGoals`, `#summaryXp` |
 | Statistics charts | Weekly Activity stacks Step/Quest/Arc events, with explicit Unclassified history and mouse/keyboard tooltips; no Skill icons; dynamic user-created Life Areas, not a fixed set of six | `statistics.js`, `statistics-model.js` |
@@ -39,8 +49,7 @@ The dashboard and Skill page render Goals separately, so changes to Goal actions
 account for both render paths. The Life Areas dialog intentionally has no
 `createStatisticsSkill` element or `addSkill` callback.
 
-Skills progress fills use fresh emerald (`#287A50`) with lighter green highlights and deep `#1E4C34` shading;
-the user's XP fill uses gold. Reward feedback
+Sidebar Skills and user XP restore the original rounded tracks and satin white/gold fills. Reward feedback
 sequences a 700 ms fill, a 380 ms gold sweep and, at progress >= 90%, a 4.2-second
 glow pulse. Level-up fills to 100%, sweeps, flashes for 560 ms, then fills the new
 level's remaining XP; the toast is queued with the flash. CSS motion tokens control

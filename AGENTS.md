@@ -19,7 +19,8 @@ them; update the documentation alongside that change.
   menu with permanently visible Edit/Delete buttons. Skill rows use this shared menu mechanism with Skill-specific Edit/Delete handlers;
   do not restore permanent action buttons or hover-only controls.
 - The Statistics **Life Areas** dialog has no **+ Create a Skill** button. It assigns
-  existing Skills. Skill creation remains in the dashboard's Skills panel. Do not
+  existing Skills. Skill creation remains in the dashboard's Skills panel as a **+** button with an
+  accessible **Add skill** label. Do not
   restore `createStatisticsSkill` or the removed `addSkill` view callback.
 - The profile-card avatar is a real upload control, not a decorative placeholder. It shows
   a **+** inside the ring until a photo is set and opens the shared actions menu with

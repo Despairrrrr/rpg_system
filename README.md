@@ -6,26 +6,34 @@ Works fully offline with `localStorage`. Optionally, Google sign-in syncs progre
 
 ## Visual skin
 
-Journey and Goals use quiet warm parchment; the profile/Skills panels, Skill detail
-page and Statistics use the original deep Midnight Archive surfaces. Mineral greens,
-warm metallic gold and wine accents add natural color depth, with restrained satin
-gradients on panels and primary buttons. Existing layouts, labels,
-controls and application logic are preserved. `styles.css` follows the existing
-Statistics visibility attribute to theme the header and dialogs without new state.
-MedievalSharp is reserved for headings and the character name; body text, controls,
-Skills, metadata and numbers use the system UI font stack. Today goal titles use a readable
-Georgia/serif stack (14px Step, 15px Quest), including Cyrillic fallback. MedievalSharp is bundled in `assets/fonts/` under the included SIL Open Font License;
-no font service or new JavaScript dependency is required. Corner artwork adapts the
-provided reference SVG paths; the existing five streak frames retain their geometry
-and animations with muted colors. The storage key remains `neonGoalTracker.v1`.
+Journey and Goals use quiet warm parchment; the profile and Skills sidebar uses a sci-fi
+Status Window HUD. Translucent teal/emerald glass (86–90% opacity, 12px backdrop blur)
+reveals the page beneath it, with a saturated emerald centre, dark blue-green edges,
+#1CEED6 / #00F0FF glowing borders and white text with a soft turquoise halo. The gradient remains usable without backdrop-filter support.
+The two panels have white diamond ornaments at all four corners, without neon corner brackets or a Status Window caption. Typography restores
+MedievalSharp for the name and Skills heading and the system UI stack for other text.
+Skill creation shows only **+**, with an accessible Add skill label; **…** menu contours fade in on hover and out on mouse leave (180 ms).
+Keyboard focus stays visible; reduced motion disables the fade. Edit and **+** use
+the original 10px rounded corners. Add a Goal retains its outline treatment.
 
-Skills progress bars use a fresh emerald gradient based on `#287A50`, with lighter green highlights and deep `#1E4C34` shading;
-the user's XP bar uses the gold
-finish from `gold-progress.html`. Rewards fill the bar over 700 ms, then send a
-380 ms gold highlight across it. At 90% or more, a slow 4.2-second glow pulse follows.
-Level-up fills the old level to 100%, sweeps, flashes for 560 ms, then fills the new
-level with remaining XP. Undo and fresh renders cancel obsolete effects. Reduced
-motion settles immediately, with a static halo at 90% or more.
+The avatar retains photo upload and its menu. Two glowing outer arcs rotate clockwise
+at a constant speed (12 seconds per revolution) on the outer radius formerly used by
+the dashed guide. The guide is removed. There is no solid middle ring or inner arc; reduced motion keeps the arcs stationary.
+The original five SVG day-streak frames and their tier animations are restored.
+Existing user names, XP and Skills are never replaced by display fixtures.
+The storage key remains `neonGoalTracker.v1`.
+
+XP and Skill bars restore the original rounded tracks and satin fills: gold XP and
+white/silver Skills. Only the Skill fill palette changes; gradient stops, highlights,
+track shape and reward timing remain intact. Rewards fill over 700 ms, followed by the original 380 ms gold
+sweep. At 90% or more, a slow 4.2-second glow pulse follows. Level-up flashes for
+560 ms before showing the new level's remaining XP. Undo and fresh renders cancel
+obsolete effects; reduced motion settles immediately with a static halo.
+
+Skill detail and Statistics retain deep Midnight Archive surfaces and the existing
+chart palette. MedievalSharp is bundled under the SIL Open Font License; body text
+uses the system UI stack and Goal titles use Georgia with Cyrillic fallback.
+The existing navigation, forms, layouts and persistence behavior remain in place.
 
 Today's cards retain their compact dimensions: emerald Steps carry a small diamond, amber Quests
 a scroll. Focus has a wine/ivory header and a thin 2px gold frame, stronger than either type

@@ -2177,6 +2177,117 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
     var(--surface) 48%,
     color-mix(in srgb, var(--bg-deep) 10%, var(--surface)));
 }
+/* Status Window HUD: translucent teal/emerald glass with opaque, readable content. */
+.sidebar > :is(.profile-card, .skills-card) {
+  color-scheme: dark;
+  --surface: rgba(3, 65, 66, .65);
+  --surface-hover: rgba(28, 238, 214, .18);
+  --text: #FFFFFF;
+  --muted: #FFFFFF;
+  --border: rgba(28, 238, 214, .85);
+  --border-soft: rgba(28, 238, 214, .38);
+  --accent-text: #FFFFFF;
+  --blue: var(--accent-text);
+  font-family: var(--font-ui);
+  color: var(--text);
+  border-radius: 3px;
+  background: linear-gradient(110deg, rgba(3, 49, 61, .90), rgba(0, 103, 100, .86) 24%, rgba(0, 116, 100, .86) 50%, rgba(0, 103, 100, .86) 76%, rgba(3, 49, 61, .90));
+  -webkit-backdrop-filter: blur(12px) saturate(125%);
+  backdrop-filter: blur(12px) saturate(125%);
+  text-shadow: 0 0 3px rgba(0, 62, 61, .9), 0 0 9px rgba(28, 238, 214, .55);
+  box-shadow: inset 0 0 24px rgba(0, 240, 255, .12),
+    0 0 14px rgba(28, 238, 214, .32), 0 12px 30px rgba(3, 39, 39, .2);
+}
+.sidebar > :is(.profile-card, .skills-card)::before {
+  inset: 5px;
+  border-color: rgba(28, 238, 214, .32);
+  border-radius: 0;
+}
+.sidebar > :is(.profile-card, .skills-card)::after {
+  --diamond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M7 1 13 7 7 13 1 7Z' fill='white'/%3E%3C/svg%3E");
+  inset: -7px;
+  border: 0;
+  border-image: none;
+  border-radius: 0;
+  background-image: var(--diamond), var(--diamond), var(--diamond), var(--diamond);
+  background-position: left top, right top, left bottom, right bottom;
+  background-size: 14px 14px;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, .45));
+}
+.sidebar .profile-card .level-row strong { color: #FFFFFF; }
+.sidebar .skill-row { border-bottom-color: var(--border-soft); }
+.sidebar .skill-row:hover { background: rgba(28, 238, 214, .06); }
+.sidebar .skill-name { color: var(--text); }
+.sidebar .avatar {
+  padding: 10px;
+  overflow: visible;
+  border: 0;
+  background: radial-gradient(circle, rgba(28, 238, 214, .16), rgba(2, 40, 44, .5));
+  color: #FFFFFF;
+  box-shadow: inset 0 0 18px #1CEED622, 0 0 12px #1CEED633;
+}
+.sidebar .avatar::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+.sidebar .avatar::before {
+  inset: -5px;
+  border: 2px solid transparent;
+  border-top-color: #1CEED6;
+  border-bottom-color: #1CEED6;
+  transform: rotate(-35deg);
+  filter: drop-shadow(0 0 4px #1CEED6);
+}
+.sidebar .avatar img { border-radius: 50%; }
+.sidebar .avatar:hover { box-shadow: inset 0 0 18px #1CEED622, 0 0 20px #1CEED644; }
+/* Two arcs orbit on the former dashed guide radius, leaving the centre clear. */
+@keyframes avatar-orbit {
+  from { transform: rotate(-35deg); }
+  to { transform: rotate(325deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar .avatar::before { animation: avatar-orbit 12s linear infinite; }
+}
+/* Keep the same buttons and keyboard behavior; only their surface changes. */
+:is(#editProfileBtn, #openSkillModalBtn, #addJourneyGoal, #openGoalModalBtn, .journey-empty .secondary-btn) {
+  color: #FFFFFF;
+  border: 1px solid rgba(28, 238, 214, .7);
+  border-radius: 2px;
+  background: rgba(3, 62, 65, .82);
+  box-shadow: inset 0 0 8px #1CEED60D, 0 0 6px #1CEED620;
+  text-shadow: 0 0 6px #1CEED655;
+}
+:is(#editProfileBtn, #openSkillModalBtn) { padding: 7px 10px; min-height: 34px; border-radius: 10px; }
+#openSkillModalBtn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+}
+.sidebar .skill-menu-trigger,
+.sidebar .skill-menu-trigger[aria-expanded="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  text-shadow: none;
+}
+.sidebar .skill-menu-trigger:hover { border-color: rgba(28, 238, 214, .7); }
+.sidebar .skill-menu-trigger:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+:is(#editProfileBtn, #openSkillModalBtn, #addJourneyGoal, #openGoalModalBtn, .journey-empty .secondary-btn):hover {
+  color: #FFFFFF;
+  background: rgba(0, 100, 91, .9);
+  border-color: #1CEED6;
+  box-shadow: 0 0 12px #1CEED655;
+}
+:is(#editProfileBtn, #openSkillModalBtn, #addJourneyGoal, #openGoalModalBtn, .journey-empty .secondary-btn):focus-visible {
+  outline: 2px solid #00F0FF;
+  outline-offset: 3px;
+}
+
 .primary-btn {
   background: linear-gradient(170deg,
     color-mix(in srgb, var(--gold-soft) 18%, var(--surface)),
@@ -2227,11 +2338,11 @@ body[data-page="skill"]::before, body:has(#statisticsPage:not([hidden]))::before
 .progress, .progression-track { border-color: var(--border-soft); background: var(--bg-deep); }
 .progress-fill, .xp-fill { background: var(--gold); box-shadow: none; }
 .skill-fill {
-  --level-glow: #21d793;
+  --level-glow: #FFFFFF;
   background:
-    linear-gradient(110deg, transparent 40%, #c4ffe780 49%, transparent 58%) 140% 0 / 250% 100% no-repeat,
-    linear-gradient(180deg, #65B88A 0%, #287A50 35%, #1E4C34 75%, #3C9465 100%);
-  box-shadow: inset 0 1px 0 #d6ffee66, 0 0 7px #15dc9666;
+    linear-gradient(110deg, transparent 40%, #FFFFFF80 49%, transparent 58%) 140% 0 / 250% 100% no-repeat,
+    linear-gradient(180deg, #FFFFFF 0%, #E7EEEE 35%, #BCCACA 75%, #F1F7F7 100%);
+  box-shadow: inset 0 1px 0 #FFFFFF66, 0 0 7px #FFFFFF66;
 }
 .xp-fill {
   --level-glow: #edc459;
